@@ -31,11 +31,11 @@ export async function init(canvas) {
   });
   device.queue.writeBuffer(positionBuffer, 0, positions);
 
-  // Uniform buffer for time and phase
-  const uniformBuffer = device.createBuffer({
+  // Uniform buffers for each spiral (one per spiral to avoid race conditions)
+  const uniformBuffers = [0, 1, 2].map(() => device.createBuffer({
     size: 32, // time, phase, color (vec3), padding
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-  });
+  }));
 
   const drawLines = createGPULines(device, {
     format,
@@ -65,7 +65,7 @@ export async function init(canvas) {
         let pos = vec4f(
           0.5 * cos(theta),
           0.5 * (x * 2.0 - 1.0) * 1.5,
-          0.5 * sin(theta),
+          0.25 + 0.25 * sin(theta),  // WebGPU clip z is [0,1], not [-1,1]
           1.0
         );
         return Vertex(pos, ${(width * devicePixelRatio).toFixed(1)});
@@ -96,13 +96,16 @@ export async function init(canvas) {
     depthCompare: 'less'
   });
 
-  const dataBindGroup = device.createBindGroup({
-    layout: drawLines.getBindGroupLayout(1),
-    entries: [
-      { binding: 0, resource: { buffer: positionBuffer } },
-      { binding: 1, resource: { buffer: uniformBuffer } }
-    ]
-  });
+  // Create bind groups for each spiral
+  const dataBindGroups = uniformBuffers.map(uniformBuffer =>
+    device.createBindGroup({
+      layout: drawLines.getBindGroupLayout(1),
+      entries: [
+        { binding: 0, resource: { buffer: positionBuffer } },
+        { binding: 1, resource: { buffer: uniformBuffer } }
+      ]
+    })
+  );
 
   // Create depth texture
   let depthTexture = device.createTexture({
@@ -116,7 +119,7 @@ export async function init(canvas) {
     [0.0, 0.5, 1.0],
     [1.0, 0.0, 0.5]
   ];
-  const phases = [0, Math.PI / 2, Math.PI];
+  const phases = [0, Math.PI * 2 / 3, Math.PI * 4 / 3];
 
   function render(time = 0) {
     // Recreate depth texture if canvas size changed
@@ -150,7 +153,7 @@ export async function init(canvas) {
       resolution: [canvas.width, canvas.height]
     };
 
-    // Draw three spirals with different phases and colors
+    // Update uniforms for all spirals before the render pass
     for (let i = 0; i < 3; i++) {
       const uniforms = new Float32Array([
         time * 0.001, // time
@@ -159,8 +162,12 @@ export async function init(canvas) {
         ...colors[i], // color
         0             // padding
       ]);
-      device.queue.writeBuffer(uniformBuffer, 0, uniforms);
-      drawLines.draw(pass, props, [dataBindGroup]);
+      device.queue.writeBuffer(uniformBuffers[i], 0, uniforms);
+    }
+
+    // Draw three spirals with different phases and colors
+    for (let i = 0; i < 3; i++) {
+      drawLines.draw(pass, props, [dataBindGroups[i]]);
     }
 
     pass.end();
