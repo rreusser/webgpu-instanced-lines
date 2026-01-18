@@ -73,13 +73,13 @@ See [docs/API.md](docs/API.md) for full API documentation.
 
 See the [examples](examples/) directory for working examples. Each demonstrates a different feature:
 
-- [**basic**](https://rreusser.github.io/webgpu-lines/basic.html) - Simple sine wave with round joins and caps
-- [**closed-loop**](https://rreusser.github.io/webgpu-lines/closed-loop.html) - Seven-sided star (closed path)
-- [**variable-width**](https://rreusser.github.io/webgpu-lines/variable-width.html) - Per-vertex width with cosine function
-- [**border**](https://rreusser.github.io/webgpu-lines/border.html) - SDF border effect with mouse interaction
-- [**dash**](https://rreusser.github.io/webgpu-lines/dash.html) - Dashing with cumulative distance tracking
-- [**multiple**](https://rreusser.github.io/webgpu-lines/multiple.html) - Multiple separate lines with line breaks
-- [**depth**](https://rreusser.github.io/webgpu-lines/depth.html) - Blended closed loop with transparency
+- [**basic**](https://rreusser.github.io/webgpu-instanced-lines/basic.html) - Simple sine wave with round joins and caps
+- [**closed-loop**](https://rreusser.github.io/webgpu-instanced-lines/closed-loop.html) - Seven-sided star (closed path)
+- [**variable-width**](https://rreusser.github.io/webgpu-instanced-lines/variable-width.html) - Per-vertex width with cosine function
+- [**border**](https://rreusser.github.io/webgpu-instanced-lines/border.html) - SDF border effect with mouse interaction
+- [**dash**](https://rreusser.github.io/webgpu-instanced-lines/dash.html) - Dashing with cumulative distance tracking
+- [**multiple**](https://rreusser.github.io/webgpu-instanced-lines/multiple.html) - Multiple separate lines with line breaks
+- [**depth**](https://rreusser.github.io/webgpu-instanced-lines/depth.html) - Blended closed loop with transparency
 
 ## License
 
