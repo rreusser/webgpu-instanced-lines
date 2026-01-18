@@ -249,9 +249,10 @@ export function createGPULines(device, options) {
   const _uniformData = new ArrayBuffer(40);
   const _f32 = new Float32Array(_uniformData);
   const _u32 = new Uint32Array(_uniformData);
-  // Initialize values with defaults (some can be overridden at draw-time)
-  _f32[2] = defaultCapRes2;
-  _f32[3] = defaultJoinRes2;
+  // Initialize values with max resolutions as defaults (can be overridden at draw-time)
+  // Using max values means it "just works" without requiring runtime parameters
+  _f32[2] = maxCapRes2;
+  _f32[3] = maxJoinRes2;
   _f32[4] = effectiveMiterLimit * effectiveMiterLimit;
   _u32[5] = isRound ? 1 : 0;
   _u32[7] = insertCaps ? 1 : 0;
@@ -261,8 +262,8 @@ export function createGPULines(device, options) {
   let _lastPointCount = -1;
   let _lastResX = -1;
   let _lastResY = -1;
-  let _lastCapRes2 = defaultCapRes2;
-  let _lastJoinRes2 = defaultJoinRes2;
+  let _lastCapRes2 = maxCapRes2;
+  let _lastJoinRes2 = maxJoinRes2;
   let _lastMiterLimit2 = effectiveMiterLimit * effectiveMiterLimit;
   let _uniformsWritten = false;
 
@@ -288,8 +289,8 @@ export function createGPULines(device, options) {
     updateUniforms(props) {
       const { vertexCount: pointCount, resolution } = props;
 
-      // Compute effective resolution values (clamped to max)
-      let capRes2 = defaultCapRes2;
+      // Compute effective resolution values (default to max, allow override up to max)
+      let capRes2 = maxCapRes2;
       if (cap === 'round' && props.capResolution !== undefined) {
         const clampedCapRes = Math.min(props.capResolution, maxCapResolution);
         if (props.capResolution > maxCapResolution) {
@@ -298,7 +299,7 @@ export function createGPULines(device, options) {
         capRes2 = clampedCapRes * 2;
       }
 
-      let joinRes2 = defaultJoinRes2;
+      let joinRes2 = maxJoinRes2;
       if (isRound && props.joinResolution !== undefined) {
         const clampedJoinRes = Math.min(props.joinResolution, maxJoinResolution);
         if (props.joinResolution > maxJoinResolution) {
