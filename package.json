@@ -1,0 +1,48 @@
+{
+  "name": "webgpu-lines",
+  "version": "0.1.0",
+  "description": "GPU-accelerated line rendering for WebGPU with joins and caps",
+  "type": "module",
+  "main": "dist/webgpu-lines.esm.js",
+  "module": "dist/webgpu-lines.esm.js",
+  "browser": "dist/webgpu-lines.umd.min.js",
+  "exports": {
+    ".": {
+      "import": "./dist/webgpu-lines.esm.js",
+      "require": "./dist/webgpu-lines.umd.min.js",
+      "default": "./dist/webgpu-lines.esm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "webgpu-lines.js"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "build:examples": "node scripts/build-examples.js",
+    "prepublishOnly": "npm run build",
+    "test": "node test/run-tests.js",
+    "test:update": "node test/run-tests.js --update",
+    "docs:preview": "vite",
+    "docs:build": "notebooks build --root docs -- docs/*.html"
+  },
+  "keywords": [
+    "webgpu",
+    "lines",
+    "rendering",
+    "graphics",
+    "gpu"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@observablehq/notebook-kit": "^1.5.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rreusser/mcp-observable-notebookkit-debug": "file:../mcp-observable-notebookkit-debug",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "rollup": "^4.9.0",
+    "vite": "^6.0.0",
+    "webgpu": "^0.3.8"
+  }
+}
