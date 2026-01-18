@@ -1,6 +1,6 @@
 // Multiple example: Multiple separate lines with line breaks (NaN/w=0)
 
-import { createGPULines } from '../webgpu-lines.js';
+import { createGPULines } from '../webgpu-instanced-lines.js';
 
 export async function init(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();
@@ -61,7 +61,7 @@ export async function init(canvas) {
 
       fn getVertex(index: u32) -> Vertex {
         let p = positions[index];
-        return Vertex(p, 40.0, p.xy);
+        return Vertex(p, 40.0 * ${devicePixelRatio.toFixed(1)}, p.xy);
       }
     `,
     fragmentShaderBody: /* wgsl */`
@@ -102,7 +102,6 @@ export async function init(canvas) {
 
     drawLines.draw(pass, {
       vertexCount: points.length,
-      width: 40,
       resolution: [canvas.width, canvas.height]
     }, [dataBindGroup]);
 

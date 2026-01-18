@@ -1,4 +1,4 @@
-# WebGPU Lines
+# WebGPU Instanced Lines
 
 High-performance, flexible GPU-accelerated line rendering for WebGPU. This is a direct port of [regl-gpu-lines](https://github.com/rreusser/regl-gpu-lines) to WebGPU. The focus is on speed and customizability rather than sophisticated stroke expansion algorithms.
 
@@ -7,13 +7,13 @@ For background on GPU line rendering, see Matt DesLauriers' [Drawing Lines is Ha
 ## Installation
 
 ```bash
-npm install webgpu-lines
+npm install webgpu-instanced-lines
 ```
 
 ## Usage
 
 ```javascript
-import { createGPULines } from 'webgpu-lines';
+import { createGPULines } from 'webgpu-instanced-lines';
 
 const gpuLines = createGPULines(device, {
   format: canvasFormat,
@@ -28,7 +28,7 @@ const gpuLines = createGPULines(device, {
     }
 
     fn getVertex(index: u32) -> Vertex {
-      return Vertex(positions[index], 10.0);
+      return Vertex(positions[index], 20.0 * ${devicePixelRatio.toFixed(1)});
     }
   `,
   fragmentShaderBody: /* wgsl */`
@@ -41,7 +41,6 @@ const gpuLines = createGPULines(device, {
 // In render loop:
 gpuLines.draw(pass, {
   vertexCount: numPoints,
-  width: 20,
   resolution: [canvas.width, canvas.height]
 }, [dataBindGroup]);
 ```
@@ -74,13 +73,13 @@ See [docs/API.md](docs/API.md) for full API documentation.
 
 See the [examples](examples/) directory for working examples. Each demonstrates a different feature:
 
-- **basic** - Simple sine wave with round joins and caps
-- **closed-loop** - Seven-sided star (closed path)
-- **variable-width** - Per-vertex width with cosine function
-- **border** - SDF border effect with mouse interaction
-- **dash** - Dashing with cumulative distance tracking
-- **multiple** - Multiple separate lines with line breaks
-- **depth** - Blended closed loop with transparency
+- [**basic**](https://rreusser.github.io/webgpu-lines/basic.html) - Simple sine wave with round joins and caps
+- [**closed-loop**](https://rreusser.github.io/webgpu-lines/closed-loop.html) - Seven-sided star (closed path)
+- [**variable-width**](https://rreusser.github.io/webgpu-lines/variable-width.html) - Per-vertex width with cosine function
+- [**border**](https://rreusser.github.io/webgpu-lines/border.html) - SDF border effect with mouse interaction
+- [**dash**](https://rreusser.github.io/webgpu-lines/dash.html) - Dashing with cumulative distance tracking
+- [**multiple**](https://rreusser.github.io/webgpu-lines/multiple.html) - Multiple separate lines with line breaks
+- [**depth**](https://rreusser.github.io/webgpu-lines/depth.html) - Blended closed loop with transparency
 
 ## License
 

@@ -1,6 +1,6 @@
 // Depth example: Animated 3D spirals with depth testing and SDF borders
 
-import { createGPULines } from '../webgpu-lines.js';
+import { createGPULines } from '../webgpu-instanced-lines.js';
 
 export async function init(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();
@@ -68,7 +68,7 @@ export async function init(canvas) {
           0.5 * sin(theta),
           1.0
         );
-        return Vertex(pos, uniforms.width);
+        return Vertex(pos, ${(width * devicePixelRatio).toFixed(1)});
       }
     `,
     fragmentShaderBody: /* wgsl */`
@@ -81,7 +81,7 @@ export async function init(canvas) {
       }
 
       fn getColor(lineCoord: vec2f) -> vec4f {
-        let width = uniforms.width;
+        let width = ${(width * devicePixelRatio).toFixed(1)};
         let borderWidth = ${(borderWidth * devicePixelRatio).toFixed(1)};
 
         // Convert the line coord into an SDF
@@ -147,7 +147,6 @@ export async function init(canvas) {
 
     const props = {
       vertexCount: n,
-      width: width * devicePixelRatio,
       resolution: [canvas.width, canvas.height]
     };
 

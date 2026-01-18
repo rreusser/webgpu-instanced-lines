@@ -1,6 +1,6 @@
 // Variable width example: Per-vertex width with cosine function and rainbow color
 
-import { createGPULines } from '../webgpu-lines.js';
+import { createGPULines } from '../webgpu-instanced-lines.js';
 
 export async function init(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();
@@ -44,7 +44,8 @@ export async function init(canvas) {
       fn getVertex(index: u32) -> Vertex {
         let p = positions[index];
         // Variable width based on x position
-        let w = uniforms.width * (0.5 + 0.4 * cos(16.0 * p.x));
+        let baseWidth = 50.0 * ${devicePixelRatio.toFixed(1)};
+        let w = baseWidth * (0.5 + 0.4 * cos(16.0 * p.x));
         return Vertex(p, w, p.x);
       }
     `,
@@ -81,7 +82,6 @@ export async function init(canvas) {
 
     drawLines.draw(pass, {
       vertexCount: n,
-      width: 50 * devicePixelRatio,
       resolution: [canvas.width, canvas.height]
     }, [dataBindGroup]);
 

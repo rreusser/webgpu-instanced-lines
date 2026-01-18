@@ -210,11 +210,11 @@ export function createGPULines(device, options) {
 
   const pipeline = device.createRenderPipeline(pipelineDescriptor);
 
-  // Uniform buffer layout (48 bytes):
-  // resolution(8) + vertCnt2(8) + miterLimit(4) + isRound(4) + width(4) + pointCount(4) + insertCaps(4) + pad(4) + capScale(8)
+  // Uniform buffer layout (40 bytes):
+  // resolution(8) + vertCnt2(8) + miterLimit(4) + isRound(4) + pointCount(4) + insertCaps(4) + capScale(8)
   const uniformBuffer = device.createBuffer({
     label: 'gpu-lines-uniforms',
-    size: 48,
+    size: 40,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
 
@@ -225,7 +225,7 @@ export function createGPULines(device, options) {
   });
 
   // Pre-allocate uniform data buffer and cache last values to avoid redundant writes
-  const _uniformData = new ArrayBuffer(48);
+  const _uniformData = new ArrayBuffer(40);
   const _f32 = new Float32Array(_uniformData);
   const _u32 = new Uint32Array(_uniformData);
   // Initialize static values that never change
@@ -233,12 +233,10 @@ export function createGPULines(device, options) {
   _f32[3] = joinRes2;
   _f32[4] = effectiveMiterLimit * effectiveMiterLimit;
   _u32[5] = isRound ? 1 : 0;
-  _u32[8] = insertCaps ? 1 : 0;
-  _u32[9] = 0; // padding
-  _f32[10] = capScale[0];
-  _f32[11] = capScale[1];
+  _u32[7] = insertCaps ? 1 : 0;
+  _f32[8] = capScale[0];
+  _f32[9] = capScale[1];
   // Track last dynamic values to detect changes
-  let _lastWidth = -1;
   let _lastPointCount = -1;
   let _lastResX = -1;
   let _lastResY = -1;
@@ -258,15 +256,13 @@ export function createGPULines(device, options) {
      * Call this before beginRenderPass() to avoid writes during the pass.
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
-     * @param {number} props.width - Line width in pixels
      * @param {Array<number>} props.resolution - [width, height] of render target
      */
     updateUniforms(props) {
-      const { vertexCount: pointCount, width, resolution } = props;
+      const { vertexCount: pointCount, resolution } = props;
 
       // Only write if values changed
       const needsUpdate = !_uniformsWritten ||
-        width !== _lastWidth ||
         pointCount !== _lastPointCount ||
         resolution[0] !== _lastResX ||
         resolution[1] !== _lastResY;
@@ -274,11 +270,9 @@ export function createGPULines(device, options) {
       if (needsUpdate) {
         _f32[0] = resolution[0];
         _f32[1] = resolution[1];
-        _f32[6] = width;
-        _u32[7] = pointCount;
+        _u32[6] = pointCount;
         device.queue.writeBuffer(uniformBuffer, 0, _uniformData);
 
-        _lastWidth = width;
         _lastPointCount = pointCount;
         _lastResX = resolution[0];
         _lastResY = resolution[1];
@@ -291,7 +285,6 @@ export function createGPULines(device, options) {
      * @param {GPURenderPassEncoder} pass - Render pass
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
-     * @param {number} props.width - Line width in pixels (used if no per-vertex width)
      * @param {Array<number>} props.resolution - [width, height] of render target
      * @param {boolean} [props.skipUniformUpdate] - Skip uniform update (call updateUniforms first)
      * @param {Array<GPUBindGroup>} [bindGroups] - User bind groups for groups 1, 2, etc.
@@ -362,10 +355,8 @@ struct Uniforms {
   vertCnt2: vec2f,
   miterLimit: f32,
   isRound: u32,
-  width: f32,
   pointCount: u32,
   insertCaps: u32,
-  _pad: u32,
   capScale: vec2f,
 }
 
@@ -644,10 +635,8 @@ struct Uniforms {
   vertCnt2: vec2f,
   miterLimit: f32,
   isRound: u32,
-  width: f32,
   pointCount: u32,
   insertCaps: u32,
-  _pad: u32,
   capScale: vec2f,
 }
 

@@ -3,18 +3,18 @@ import terser from '@rollup/plugin-terser';
 export default [
   // ESM build (unminified)
   {
-    input: 'webgpu-lines.js',
+    input: 'webgpu-instanced-lines.js',
     output: {
-      file: 'dist/webgpu-lines.esm.js',
+      file: 'dist/webgpu-instanced-lines.esm.js',
       format: 'esm',
       sourcemap: true
     }
   },
   // ESM build (minified)
   {
-    input: 'webgpu-lines.js',
+    input: 'webgpu-instanced-lines.js',
     output: {
-      file: 'dist/webgpu-lines.esm.min.js',
+      file: 'dist/webgpu-instanced-lines.esm.min.js',
       format: 'esm',
       sourcemap: true
     },
@@ -22,11 +22,11 @@ export default [
   },
   // UMD build (minified) for browser <script> tag
   {
-    input: 'webgpu-lines.js',
+    input: 'webgpu-instanced-lines.js',
     output: {
-      file: 'dist/webgpu-lines.umd.min.js',
+      file: 'dist/webgpu-instanced-lines.umd.min.js',
       format: 'umd',
-      name: 'WebGPULines',
+      name: 'WebGPUInstancedLines',
       sourcemap: true
     },
     plugins: [terser()]

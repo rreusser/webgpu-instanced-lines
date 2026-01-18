@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>webgpu-lines: multiple</title>
+  <title>webgpu-instanced-lines: multiple</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
@@ -65,7 +65,7 @@
 <div id="error"></div>
 
 <script type="module">
-// webgpu-lines library (inlined)
+// webgpu-instanced-lines library (inlined)
 /**
  * WebGPU GPU Lines - Instanced line rendering for WebGPU
  *
@@ -278,11 +278,11 @@ export function createGPULines(device, options) {
 
   const pipeline = device.createRenderPipeline(pipelineDescriptor);
 
-  // Uniform buffer layout (48 bytes):
-  // resolution(8) + vertCnt2(8) + miterLimit(4) + isRound(4) + width(4) + pointCount(4) + insertCaps(4) + pad(4) + capScale(8)
+  // Uniform buffer layout (40 bytes):
+  // resolution(8) + vertCnt2(8) + miterLimit(4) + isRound(4) + pointCount(4) + insertCaps(4) + capScale(8)
   const uniformBuffer = device.createBuffer({
     label: 'gpu-lines-uniforms',
-    size: 48,
+    size: 40,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
 
@@ -293,7 +293,7 @@ export function createGPULines(device, options) {
   });
 
   // Pre-allocate uniform data buffer and cache last values to avoid redundant writes
-  const _uniformData = new ArrayBuffer(48);
+  const _uniformData = new ArrayBuffer(40);
   const _f32 = new Float32Array(_uniformData);
   const _u32 = new Uint32Array(_uniformData);
   // Initialize static values that never change
@@ -301,12 +301,10 @@ export function createGPULines(device, options) {
   _f32[3] = joinRes2;
   _f32[4] = effectiveMiterLimit * effectiveMiterLimit;
   _u32[5] = isRound ? 1 : 0;
-  _u32[8] = insertCaps ? 1 : 0;
-  _u32[9] = 0; // padding
-  _f32[10] = capScale[0];
-  _f32[11] = capScale[1];
+  _u32[7] = insertCaps ? 1 : 0;
+  _f32[8] = capScale[0];
+  _f32[9] = capScale[1];
   // Track last dynamic values to detect changes
-  let _lastWidth = -1;
   let _lastPointCount = -1;
   let _lastResX = -1;
   let _lastResY = -1;
@@ -326,15 +324,13 @@ export function createGPULines(device, options) {
      * Call this before beginRenderPass() to avoid writes during the pass.
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
-     * @param {number} props.width - Line width in pixels
      * @param {Array<number>} props.resolution - [width, height] of render target
      */
     updateUniforms(props) {
-      const { vertexCount: pointCount, width, resolution } = props;
+      const { vertexCount: pointCount, resolution } = props;
 
       // Only write if values changed
       const needsUpdate = !_uniformsWritten ||
-        width !== _lastWidth ||
         pointCount !== _lastPointCount ||
         resolution[0] !== _lastResX ||
         resolution[1] !== _lastResY;
@@ -342,11 +338,9 @@ export function createGPULines(device, options) {
       if (needsUpdate) {
         _f32[0] = resolution[0];
         _f32[1] = resolution[1];
-        _f32[6] = width;
-        _u32[7] = pointCount;
+        _u32[6] = pointCount;
         device.queue.writeBuffer(uniformBuffer, 0, _uniformData);
 
-        _lastWidth = width;
         _lastPointCount = pointCount;
         _lastResX = resolution[0];
         _lastResY = resolution[1];
@@ -359,7 +353,6 @@ export function createGPULines(device, options) {
      * @param {GPURenderPassEncoder} pass - Render pass
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
-     * @param {number} props.width - Line width in pixels (used if no per-vertex width)
      * @param {Array<number>} props.resolution - [width, height] of render target
      * @param {boolean} [props.skipUniformUpdate] - Skip uniform update (call updateUniforms first)
      * @param {Array<GPUBindGroup>} [bindGroups] - User bind groups for groups 1, 2, etc.
@@ -430,10 +423,8 @@ struct Uniforms {
   vertCnt2: vec2f,
   miterLimit: f32,
   isRound: u32,
-  width: f32,
   pointCount: u32,
   insertCaps: u32,
-  _pad: u32,
   capScale: vec2f,
 }
 
@@ -712,10 +703,8 @@ struct Uniforms {
   vertCnt2: vec2f,
   miterLimit: f32,
   isRound: u32,
-  width: f32,
   pointCount: u32,
   insertCaps: u32,
-  _pad: u32,
   capScale: vec2f,
 }
 
@@ -800,7 +789,7 @@ export async function init(canvas) {
 
       fn getVertex(index: u32) -> Vertex {
         let p = positions[index];
-        return Vertex(p, 40.0, p.xy);
+        return Vertex(p, 40.0 * ${devicePixelRatio.toFixed(1)}, p.xy);
       }
     `,
     fragmentShaderBody: /* wgsl */`
@@ -841,7 +830,6 @@ export async function init(canvas) {
 
     drawLines.draw(pass, {
       vertexCount: points.length,
-      width: 40,
       resolution: [canvas.width, canvas.height]
     }, [dataBindGroup]);
 
@@ -874,7 +862,7 @@ init(canvas).catch(err => {
 
 // Syntax highlighting
 const codeEl = document.getElementById('code');
-codeEl.textContent = "// Multiple example: Multiple separate lines with line breaks (NaN/w=0)\n\nexport async function init(canvas) {\n  const adapter = await navigator.gpu?.requestAdapter();\n  const device = await adapter?.requestDevice();\n  if (!device) throw new Error('WebGPU not supported');\n\n  const context = canvas.getContext('webgpu');\n  const format = navigator.gpu.getPreferredCanvasFormat();\n  context.configure({ device, format, alphaMode: 'premultiplied' });\n\n  const n = 31;\n  const lineCount = 10;\n\n  // Build positions with line breaks (w=0) between each line\n  const points = [];\n\n  // Start with a break to signal a cap\n  points.push([NaN, NaN, 0, 0]);\n\n  for (let line = 0; line < lineCount; line++) {\n    for (let i = 0; i < n; i++) {\n      const t = (i / (n - 1) * 2 - 1) * 0.9;\n      const y = ((line + 0.5) / lineCount * 2 - 1) * 0.9;\n      const x = t;\n      const yOffset = (1 / lineCount) * Math.sin((t - line * 0.1) * 8.0);\n      points.push([x, y + yOffset, 0, 1]);\n    }\n    // Signal a cap after each line\n    points.push([NaN, NaN, 0, 0]);\n  }\n\n  const positions = new Float32Array(points.length * 4);\n  for (let i = 0; i < points.length; i++) {\n    positions[i * 4 + 0] = points[i][0];\n    positions[i * 4 + 1] = points[i][1];\n    positions[i * 4 + 2] = points[i][2];\n    positions[i * 4 + 3] = points[i][3];\n  }\n\n  const positionBuffer = device.createBuffer({\n    size: positions.byteLength,\n    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n  });\n  device.queue.writeBuffer(positionBuffer, 0, positions);\n\n  const drawLines = createGPULines(device, {\n    format,\n    join: 'round',\n    cap: 'round',\n    vertexShaderBody: /* wgsl */`\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n        uv: vec2f,\n      }\n\n      fn getVertex(index: u32) -> Vertex {\n        let p = positions[index];\n        return Vertex(p, 40.0, p.xy);\n      }\n    `,\n    fragmentShaderBody: /* wgsl */`\n      const PI: f32 = 3.14159265359;\n\n      fn getColor(lineCoord: vec2f, uv: vec2f) -> vec4f {\n        // Convert the x-coordinate into a rainbow color\n        let r = 0.6 + 0.4 * cos(8.0 * (uv.x - 0.0 * PI / 3.0));\n        let g = 0.6 + 0.4 * cos(8.0 * (uv.x - 1.0 * PI / 3.0));\n        let b = 0.6 + 0.4 * cos(8.0 * (uv.x - 2.0 * PI / 3.0));\n        return vec4f(r, g, b, 0.7);\n      }\n    `,\n    blend: {\n      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },\n      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }\n    },\n    depthWrite: false,\n    depthCompare: 'always',\n    cullMode: 'back'\n  });\n\n  const dataBindGroup = device.createBindGroup({\n    layout: drawLines.getBindGroupLayout(1),\n    entries: [{ binding: 0, resource: { buffer: positionBuffer } }]\n  });\n\n  function render() {\n    const encoder = device.createCommandEncoder();\n    const pass = encoder.beginRenderPass({\n      colorAttachments: [{\n        view: context.getCurrentTexture().createView(),\n        clearValue: [0.2, 0.2, 0.2, 1],\n        loadOp: 'clear',\n        storeOp: 'store'\n      }]\n    });\n\n    drawLines.draw(pass, {\n      vertexCount: points.length,\n      width: 40,\n      resolution: [canvas.width, canvas.height]\n    }, [dataBindGroup]);\n\n    pass.end();\n    device.queue.submit([encoder.finish()]);\n  }\n\n  render();\n  window.addEventListener('resize', render);\n\n  return { render, destroy: () => drawLines.destroy() };\n}";
+codeEl.textContent = "// Multiple example: Multiple separate lines with line breaks (NaN/w=0)\n\nexport async function init(canvas) {\n  const adapter = await navigator.gpu?.requestAdapter();\n  const device = await adapter?.requestDevice();\n  if (!device) throw new Error('WebGPU not supported');\n\n  const context = canvas.getContext('webgpu');\n  const format = navigator.gpu.getPreferredCanvasFormat();\n  context.configure({ device, format, alphaMode: 'premultiplied' });\n\n  const n = 31;\n  const lineCount = 10;\n\n  // Build positions with line breaks (w=0) between each line\n  const points = [];\n\n  // Start with a break to signal a cap\n  points.push([NaN, NaN, 0, 0]);\n\n  for (let line = 0; line < lineCount; line++) {\n    for (let i = 0; i < n; i++) {\n      const t = (i / (n - 1) * 2 - 1) * 0.9;\n      const y = ((line + 0.5) / lineCount * 2 - 1) * 0.9;\n      const x = t;\n      const yOffset = (1 / lineCount) * Math.sin((t - line * 0.1) * 8.0);\n      points.push([x, y + yOffset, 0, 1]);\n    }\n    // Signal a cap after each line\n    points.push([NaN, NaN, 0, 0]);\n  }\n\n  const positions = new Float32Array(points.length * 4);\n  for (let i = 0; i < points.length; i++) {\n    positions[i * 4 + 0] = points[i][0];\n    positions[i * 4 + 1] = points[i][1];\n    positions[i * 4 + 2] = points[i][2];\n    positions[i * 4 + 3] = points[i][3];\n  }\n\n  const positionBuffer = device.createBuffer({\n    size: positions.byteLength,\n    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n  });\n  device.queue.writeBuffer(positionBuffer, 0, positions);\n\n  const drawLines = createGPULines(device, {\n    format,\n    join: 'round',\n    cap: 'round',\n    vertexShaderBody: /* wgsl */`\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n        uv: vec2f,\n      }\n\n      fn getVertex(index: u32) -> Vertex {\n        let p = positions[index];\n        return Vertex(p, 40.0 * ${devicePixelRatio.toFixed(1)}, p.xy);\n      }\n    `,\n    fragmentShaderBody: /* wgsl */`\n      const PI: f32 = 3.14159265359;\n\n      fn getColor(lineCoord: vec2f, uv: vec2f) -> vec4f {\n        // Convert the x-coordinate into a rainbow color\n        let r = 0.6 + 0.4 * cos(8.0 * (uv.x - 0.0 * PI / 3.0));\n        let g = 0.6 + 0.4 * cos(8.0 * (uv.x - 1.0 * PI / 3.0));\n        let b = 0.6 + 0.4 * cos(8.0 * (uv.x - 2.0 * PI / 3.0));\n        return vec4f(r, g, b, 0.7);\n      }\n    `,\n    blend: {\n      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },\n      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }\n    },\n    depthWrite: false,\n    depthCompare: 'always',\n    cullMode: 'back'\n  });\n\n  const dataBindGroup = device.createBindGroup({\n    layout: drawLines.getBindGroupLayout(1),\n    entries: [{ binding: 0, resource: { buffer: positionBuffer } }]\n  });\n\n  function render() {\n    const encoder = device.createCommandEncoder();\n    const pass = encoder.beginRenderPass({\n      colorAttachments: [{\n        view: context.getCurrentTexture().createView(),\n        clearValue: [0.2, 0.2, 0.2, 1],\n        loadOp: 'clear',\n        storeOp: 'store'\n      }]\n    });\n\n    drawLines.draw(pass, {\n      vertexCount: points.length,\n      resolution: [canvas.width, canvas.height]\n    }, [dataBindGroup]);\n\n    pass.end();\n    device.queue.submit([encoder.finish()]);\n  }\n\n  render();\n  window.addEventListener('resize', render);\n\n  return { render, destroy: () => drawLines.destroy() };\n}";
 hljs.highlightElement(codeEl);
 </script>
 </body>

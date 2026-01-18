@@ -1,6 +1,6 @@
 // Closed loop example: Seven-sided star shape
 
-import { createGPULines } from '../webgpu-lines.js';
+import { createGPULines } from '../webgpu-instanced-lines.js';
 
 export async function init(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();
@@ -48,7 +48,7 @@ export async function init(canvas) {
         let p = positions[index];
         // Apply aspect ratio correction
         let aspect = uniforms.resolution.x / uniforms.resolution.y;
-        return Vertex(vec4f(p.x, p.y * aspect, p.z, p.w), 50.0);
+        return Vertex(vec4f(p.x, p.y * aspect, p.z, p.w), 50.0 * ${devicePixelRatio.toFixed(1)});
       }
     `,
     fragmentShaderBody: /* wgsl */`
@@ -82,7 +82,6 @@ export async function init(canvas) {
 
     drawLines.draw(pass, {
       vertexCount: pointCount,
-      width: 50,
       resolution: [canvas.width, canvas.height]
     }, [dataBindGroup]);
 

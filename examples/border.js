@@ -1,6 +1,6 @@
 // Border example: SDF border effect with mouse interaction
 
-import { createGPULines } from '../webgpu-lines.js';
+import { createGPULines } from '../webgpu-instanced-lines.js';
 
 export async function init(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();
@@ -65,13 +65,13 @@ export async function init(canvas) {
         fn getVertex(index: u32) -> Vertex {
           let p = positions[index];
           let xy = p.xy * transform.scale + transform.translate;
-          return Vertex(vec4f(xy, 0.0, 1.0), uniforms.width);
+          return Vertex(vec4f(xy, 0.0, 1.0), ${width * devicePixelRatio});
         }
       `,
       fragmentShaderBody: /* wgsl */`
         fn getColor(lineCoord: vec2f) -> vec4f {
-          let width = uniforms.width;
-          let borderWidth = ${borderWidth.toFixed(1)} * ${devicePixelRatio.toFixed(1)};
+          let width = ${(width * devicePixelRatio).toFixed(1)};
+          let borderWidth = ${(borderWidth * devicePixelRatio).toFixed(1)};
 
           // Convert the line coord into an SDF
           let sdf = length(lineCoord) * width;
@@ -124,7 +124,6 @@ export async function init(canvas) {
 
     const props = {
       vertexCount: n,
-      width: width * devicePixelRatio,
       resolution: [canvas.width, canvas.height]
     };
 

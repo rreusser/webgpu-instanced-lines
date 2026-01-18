@@ -10,7 +10,7 @@ const examplesDir = join(rootDir, 'examples');
 const docsDir = join(rootDir, 'docs');
 
 // Read the main library source
-const librarySource = readFileSync(join(rootDir, 'webgpu-lines.js'), 'utf8');
+const librarySource = readFileSync(join(rootDir, 'webgpu-instanced-lines.js'), 'utf8');
 
 // Get all example files
 const examples = readdirSync(examplesDir)
@@ -26,7 +26,7 @@ function generateHTML(name, exampleSource) {
   return `<!DOCTYPE html>
 <html>
 <head>
-  <title>webgpu-lines: ${name}</title>
+  <title>webgpu-instanced-lines: ${name}</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
@@ -90,7 +90,7 @@ function generateHTML(name, exampleSource) {
 <div id="error"></div>
 
 <script type="module">
-// webgpu-lines library (inlined)
+// webgpu-instanced-lines library (inlined)
 ${librarySource}
 
 // Example code

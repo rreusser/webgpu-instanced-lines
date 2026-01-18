@@ -20,7 +20,7 @@ import {
   ensureDirectories
 } from './test-harness.js';
 
-import { createGPULines } from '../webgpu-lines.js';
+import { createGPULines } from '../webgpu-instanced-lines.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -313,7 +313,6 @@ async function run() {
 
   gpuLines.draw(pass, {
     vertexCount,
-    width: lineWidth,
     resolution: [canvasWidth, canvasHeight]
   }, [dataBindGroup]);
   pass.end();

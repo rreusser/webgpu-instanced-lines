@@ -1,4 +1,4 @@
-# WebGPU Lines API Reference
+# WebGPU Instanced Lines API Reference
 
 ## `createGPULines(device, options)`
 
@@ -142,7 +142,7 @@ The vertex shader body defines how line positions and per-vertex data are comput
 
 struct Vertex {
   position: vec4f,  // Required, clip-space position (w component controls line breaks)
-  width: f32,       // Optional, per-vertex line width
+  width: f32,       // Required, line width in pixels
   // Additional fields become varyings passed to fragment shader
 }
 
@@ -155,13 +155,13 @@ fn getVertex(index: u32) -> Vertex {
 
 Options for customization include `vertexFunction` (name of your vertex function, default `'getVertex'`), `positionField` (name of position field in struct, default `'position'`), and `widthField` (name of width field in struct, default `'width'`).
 
-Available library uniforms are `uniforms.resolution` (canvas resolution in pixels), `uniforms.width` (fallback line width if no per-vertex width), and `uniforms.pointCount` (number of points).
+Available library uniforms are `uniforms.resolution` (canvas resolution in pixels) and `uniforms.pointCount` (number of points).
 
 ## Drawing
 
 ### `gpuLines.draw(pass, props, bindGroups)`
 
-Draws lines in a render pass. The `props` object includes `vertexCount` (number of points in the line), `width` (line width in pixels, fallback if no per-vertex width), and `resolution` (canvas resolution as `[width, height]`). The `bindGroups` parameter is an array of user bind groups for groups 1, 2, etc.
+Draws lines in a render pass. The `props` object includes `vertexCount` (number of points in the line) and `resolution` (canvas resolution as `[width, height]`). The `bindGroups` parameter is an array of user bind groups for groups 1, 2, etc.
 
 ### `gpuLines.getBindGroupLayout(index)`
 
@@ -179,7 +179,6 @@ const dataBindGroup = device.createBindGroup({
 const pass = encoder.beginRenderPass({ ... });
 gpuLines.draw(pass, {
   vertexCount: points.length,
-  width: 20,
   resolution: [canvas.width, canvas.height]
 }, [dataBindGroup]);
 pass.end();

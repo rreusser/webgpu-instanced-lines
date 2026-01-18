@@ -1,6 +1,6 @@
 // Basic example: Simple sine wave with round joins and caps
 
-import { createGPULines } from '../webgpu-lines.js';
+import { createGPULines } from '../webgpu-instanced-lines.js';
 
 export async function init(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();
@@ -41,7 +41,7 @@ export async function init(canvas) {
       }
 
       fn getVertex(index: u32) -> Vertex {
-        return Vertex(positions[index], uniforms.width);
+        return Vertex(positions[index], 30.0 * ${devicePixelRatio.toFixed(1)});
       }
     `,
     fragmentShaderBody: /* wgsl */`
@@ -69,7 +69,6 @@ export async function init(canvas) {
 
     drawLines.draw(pass, {
       vertexCount: n,
-      width: 30 * devicePixelRatio,
       resolution: [canvas.width, canvas.height]
     }, [dataBindGroup]);
 

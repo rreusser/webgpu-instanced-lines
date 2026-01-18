@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>webgpu-lines: border</title>
+  <title>webgpu-instanced-lines: border</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
@@ -65,7 +65,7 @@
 <div id="error"></div>
 
 <script type="module">
-// webgpu-lines library (inlined)
+// webgpu-instanced-lines library (inlined)
 /**
  * WebGPU GPU Lines - Instanced line rendering for WebGPU
  *
@@ -278,11 +278,11 @@ export function createGPULines(device, options) {
 
   const pipeline = device.createRenderPipeline(pipelineDescriptor);
 
-  // Uniform buffer layout (48 bytes):
-  // resolution(8) + vertCnt2(8) + miterLimit(4) + isRound(4) + width(4) + pointCount(4) + insertCaps(4) + pad(4) + capScale(8)
+  // Uniform buffer layout (40 bytes):
+  // resolution(8) + vertCnt2(8) + miterLimit(4) + isRound(4) + pointCount(4) + insertCaps(4) + capScale(8)
   const uniformBuffer = device.createBuffer({
     label: 'gpu-lines-uniforms',
-    size: 48,
+    size: 40,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
 
@@ -293,7 +293,7 @@ export function createGPULines(device, options) {
   });
 
   // Pre-allocate uniform data buffer and cache last values to avoid redundant writes
-  const _uniformData = new ArrayBuffer(48);
+  const _uniformData = new ArrayBuffer(40);
   const _f32 = new Float32Array(_uniformData);
   const _u32 = new Uint32Array(_uniformData);
   // Initialize static values that never change
@@ -301,12 +301,10 @@ export function createGPULines(device, options) {
   _f32[3] = joinRes2;
   _f32[4] = effectiveMiterLimit * effectiveMiterLimit;
   _u32[5] = isRound ? 1 : 0;
-  _u32[8] = insertCaps ? 1 : 0;
-  _u32[9] = 0; // padding
-  _f32[10] = capScale[0];
-  _f32[11] = capScale[1];
+  _u32[7] = insertCaps ? 1 : 0;
+  _f32[8] = capScale[0];
+  _f32[9] = capScale[1];
   // Track last dynamic values to detect changes
-  let _lastWidth = -1;
   let _lastPointCount = -1;
   let _lastResX = -1;
   let _lastResY = -1;
@@ -326,15 +324,13 @@ export function createGPULines(device, options) {
      * Call this before beginRenderPass() to avoid writes during the pass.
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
-     * @param {number} props.width - Line width in pixels
      * @param {Array<number>} props.resolution - [width, height] of render target
      */
     updateUniforms(props) {
-      const { vertexCount: pointCount, width, resolution } = props;
+      const { vertexCount: pointCount, resolution } = props;
 
       // Only write if values changed
       const needsUpdate = !_uniformsWritten ||
-        width !== _lastWidth ||
         pointCount !== _lastPointCount ||
         resolution[0] !== _lastResX ||
         resolution[1] !== _lastResY;
@@ -342,11 +338,9 @@ export function createGPULines(device, options) {
       if (needsUpdate) {
         _f32[0] = resolution[0];
         _f32[1] = resolution[1];
-        _f32[6] = width;
-        _u32[7] = pointCount;
+        _u32[6] = pointCount;
         device.queue.writeBuffer(uniformBuffer, 0, _uniformData);
 
-        _lastWidth = width;
         _lastPointCount = pointCount;
         _lastResX = resolution[0];
         _lastResY = resolution[1];
@@ -359,7 +353,6 @@ export function createGPULines(device, options) {
      * @param {GPURenderPassEncoder} pass - Render pass
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
-     * @param {number} props.width - Line width in pixels (used if no per-vertex width)
      * @param {Array<number>} props.resolution - [width, height] of render target
      * @param {boolean} [props.skipUniformUpdate] - Skip uniform update (call updateUniforms first)
      * @param {Array<GPUBindGroup>} [bindGroups] - User bind groups for groups 1, 2, etc.
@@ -430,10 +423,8 @@ struct Uniforms {
   vertCnt2: vec2f,
   miterLimit: f32,
   isRound: u32,
-  width: f32,
   pointCount: u32,
   insertCaps: u32,
-  _pad: u32,
   capScale: vec2f,
 }
 
@@ -712,10 +703,8 @@ struct Uniforms {
   vertCnt2: vec2f,
   miterLimit: f32,
   isRound: u32,
-  width: f32,
   pointCount: u32,
   insertCaps: u32,
-  _pad: u32,
   capScale: vec2f,
 }
 
@@ -804,13 +793,13 @@ export async function init(canvas) {
         fn getVertex(index: u32) -> Vertex {
           let p = positions[index];
           let xy = p.xy * transform.scale + transform.translate;
-          return Vertex(vec4f(xy, 0.0, 1.0), uniforms.width);
+          return Vertex(vec4f(xy, 0.0, 1.0), ${width * devicePixelRatio});
         }
       `,
       fragmentShaderBody: /* wgsl */`
         fn getColor(lineCoord: vec2f) -> vec4f {
-          let width = uniforms.width;
-          let borderWidth = ${borderWidth.toFixed(1)} * ${devicePixelRatio.toFixed(1)};
+          let width = ${(width * devicePixelRatio).toFixed(1)};
+          let borderWidth = ${(borderWidth * devicePixelRatio).toFixed(1)};
 
           // Convert the line coord into an SDF
           let sdf = length(lineCoord) * width;
@@ -863,7 +852,6 @@ export async function init(canvas) {
 
     const props = {
       vertexCount: n,
-      width: width * devicePixelRatio,
       resolution: [canvas.width, canvas.height]
     };
 
@@ -916,7 +904,7 @@ init(canvas).catch(err => {
 
 // Syntax highlighting
 const codeEl = document.getElementById('code');
-codeEl.textContent = "// Border example: SDF border effect with mouse interaction\n\nexport async function init(canvas) {\n  const adapter = await navigator.gpu?.requestAdapter();\n  const device = await adapter?.requestDevice();\n  if (!device) throw new Error('WebGPU not supported');\n\n  const context = canvas.getContext('webgpu');\n  const format = navigator.gpu.getPreferredCanvasFormat();\n  context.configure({ device, format, alphaMode: 'premultiplied' });\n\n  // Construct positions for a high-frequency sine wave\n  const n = 11;\n  const positions = new Float32Array(n * 4);\n  for (let i = 0; i < n; i++) {\n    const t = (i / (n - 1) * 2.0 - 1.0) * 0.8;\n    positions[i * 4 + 0] = t;\n    positions[i * 4 + 1] = 0.5 * Math.sin(54.0 * t);\n    positions[i * 4 + 2] = 0;\n    positions[i * 4 + 3] = 1;\n  }\n\n  const positionBuffer = device.createBuffer({\n    size: positions.byteLength,\n    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n  });\n  device.queue.writeBuffer(positionBuffer, 0, positions);\n\n  // Separate uniform buffers for each line (to avoid race condition)\n  const uniformBufferRound = device.createBuffer({\n    size: 16, // 2 vec2s\n    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST\n  });\n  const uniformBufferMiter = device.createBuffer({\n    size: 16,\n    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST\n  });\n\n  const width = 35;\n  const borderWidth = 10;\n  let scale = [1, 1];\n\n  function createDrawLines(join) {\n    return createGPULines(device, {\n      format,\n      join,\n      cap: 'round',\n      miterLimit: 3.0,\n      vertexShaderBody: /* wgsl */`\n        @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n        @group(1) @binding(1) var<uniform> transform: Transform;\n\n        struct Transform {\n          scale: vec2f,\n          translate: vec2f,\n        }\n\n        struct Vertex {\n          position: vec4f,\n          width: f32,\n        }\n\n        fn getVertex(index: u32) -> Vertex {\n          let p = positions[index];\n          let xy = p.xy * transform.scale + transform.translate;\n          return Vertex(vec4f(xy, 0.0, 1.0), uniforms.width);\n        }\n      `,\n      fragmentShaderBody: /* wgsl */`\n        fn getColor(lineCoord: vec2f) -> vec4f {\n          let width = uniforms.width;\n          let borderWidth = ${borderWidth.toFixed(1)} * ${devicePixelRatio.toFixed(1)};\n\n          // Convert the line coord into an SDF\n          let sdf = length(lineCoord) * width;\n\n          let borderColor = 0.5 + 0.5 * vec3f(lineCoord.xy, 0.0);\n\n          // Apply a border with 1px transition\n          let color = mix(vec3f(0.0), borderColor, smoothstep(width - borderWidth - 1.0, width - borderWidth + 1.0, sdf));\n          return vec4f(color, 1.0);\n        }\n      `,\n      depthWrite: false,\n      depthCompare: 'always'\n    });\n  }\n\n  const drawLinesRound = createDrawLines('round');\n  const drawLinesMiter = createDrawLines('miter');\n\n  const dataBindGroupRound = device.createBindGroup({\n    layout: drawLinesRound.getBindGroupLayout(1),\n    entries: [\n      { binding: 0, resource: { buffer: positionBuffer } },\n      { binding: 1, resource: { buffer: uniformBufferRound } }\n    ]\n  });\n\n  const dataBindGroupMiter = device.createBindGroup({\n    layout: drawLinesMiter.getBindGroupLayout(1),\n    entries: [\n      { binding: 0, resource: { buffer: positionBuffer } },\n      { binding: 1, resource: { buffer: uniformBufferMiter } }\n    ]\n  });\n\n  function render() {\n    // Write uniforms BEFORE creating the render pass\n    device.queue.writeBuffer(uniformBufferRound, 0, new Float32Array([...scale, 0, -0.4]));\n    device.queue.writeBuffer(uniformBufferMiter, 0, new Float32Array([...scale, 0, 0.4]));\n\n    const encoder = device.createCommandEncoder();\n    const pass = encoder.beginRenderPass({\n      colorAttachments: [{\n        view: context.getCurrentTexture().createView(),\n        clearValue: [0.2, 0.2, 0.2, 1],\n        loadOp: 'clear',\n        storeOp: 'store'\n      }]\n    });\n\n    const props = {\n      vertexCount: n,\n      width: width * devicePixelRatio,\n      resolution: [canvas.width, canvas.height]\n    };\n\n    // Draw round joins at bottom\n    drawLinesRound.draw(pass, props, [dataBindGroupRound]);\n\n    // Draw miter joins at top\n    drawLinesMiter.draw(pass, props, [dataBindGroupMiter]);\n\n    pass.end();\n    device.queue.submit([encoder.finish()]);\n  }\n\n  canvas.addEventListener('mousemove', (e) => {\n    scale = [\n      e.offsetX / canvas.clientWidth * 2 - 1,\n      -e.offsetY / canvas.clientHeight * 2 + 1\n    ];\n    render();\n  });\n\n  render();\n  window.addEventListener('resize', render);\n\n  return {\n    render,\n    destroy: () => {\n      drawLinesRound.destroy();\n      drawLinesMiter.destroy();\n    }\n  };\n}";
+codeEl.textContent = "// Border example: SDF border effect with mouse interaction\n\nexport async function init(canvas) {\n  const adapter = await navigator.gpu?.requestAdapter();\n  const device = await adapter?.requestDevice();\n  if (!device) throw new Error('WebGPU not supported');\n\n  const context = canvas.getContext('webgpu');\n  const format = navigator.gpu.getPreferredCanvasFormat();\n  context.configure({ device, format, alphaMode: 'premultiplied' });\n\n  // Construct positions for a high-frequency sine wave\n  const n = 11;\n  const positions = new Float32Array(n * 4);\n  for (let i = 0; i < n; i++) {\n    const t = (i / (n - 1) * 2.0 - 1.0) * 0.8;\n    positions[i * 4 + 0] = t;\n    positions[i * 4 + 1] = 0.5 * Math.sin(54.0 * t);\n    positions[i * 4 + 2] = 0;\n    positions[i * 4 + 3] = 1;\n  }\n\n  const positionBuffer = device.createBuffer({\n    size: positions.byteLength,\n    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n  });\n  device.queue.writeBuffer(positionBuffer, 0, positions);\n\n  // Separate uniform buffers for each line (to avoid race condition)\n  const uniformBufferRound = device.createBuffer({\n    size: 16, // 2 vec2s\n    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST\n  });\n  const uniformBufferMiter = device.createBuffer({\n    size: 16,\n    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST\n  });\n\n  const width = 35;\n  const borderWidth = 10;\n  let scale = [1, 1];\n\n  function createDrawLines(join) {\n    return createGPULines(device, {\n      format,\n      join,\n      cap: 'round',\n      miterLimit: 3.0,\n      vertexShaderBody: /* wgsl */`\n        @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n        @group(1) @binding(1) var<uniform> transform: Transform;\n\n        struct Transform {\n          scale: vec2f,\n          translate: vec2f,\n        }\n\n        struct Vertex {\n          position: vec4f,\n          width: f32,\n        }\n\n        fn getVertex(index: u32) -> Vertex {\n          let p = positions[index];\n          let xy = p.xy * transform.scale + transform.translate;\n          return Vertex(vec4f(xy, 0.0, 1.0), ${width * devicePixelRatio});\n        }\n      `,\n      fragmentShaderBody: /* wgsl */`\n        fn getColor(lineCoord: vec2f) -> vec4f {\n          let width = ${(width * devicePixelRatio).toFixed(1)};\n          let borderWidth = ${(borderWidth * devicePixelRatio).toFixed(1)};\n\n          // Convert the line coord into an SDF\n          let sdf = length(lineCoord) * width;\n\n          let borderColor = 0.5 + 0.5 * vec3f(lineCoord.xy, 0.0);\n\n          // Apply a border with 1px transition\n          let color = mix(vec3f(0.0), borderColor, smoothstep(width - borderWidth - 1.0, width - borderWidth + 1.0, sdf));\n          return vec4f(color, 1.0);\n        }\n      `,\n      depthWrite: false,\n      depthCompare: 'always'\n    });\n  }\n\n  const drawLinesRound = createDrawLines('round');\n  const drawLinesMiter = createDrawLines('miter');\n\n  const dataBindGroupRound = device.createBindGroup({\n    layout: drawLinesRound.getBindGroupLayout(1),\n    entries: [\n      { binding: 0, resource: { buffer: positionBuffer } },\n      { binding: 1, resource: { buffer: uniformBufferRound } }\n    ]\n  });\n\n  const dataBindGroupMiter = device.createBindGroup({\n    layout: drawLinesMiter.getBindGroupLayout(1),\n    entries: [\n      { binding: 0, resource: { buffer: positionBuffer } },\n      { binding: 1, resource: { buffer: uniformBufferMiter } }\n    ]\n  });\n\n  function render() {\n    // Write uniforms BEFORE creating the render pass\n    device.queue.writeBuffer(uniformBufferRound, 0, new Float32Array([...scale, 0, -0.4]));\n    device.queue.writeBuffer(uniformBufferMiter, 0, new Float32Array([...scale, 0, 0.4]));\n\n    const encoder = device.createCommandEncoder();\n    const pass = encoder.beginRenderPass({\n      colorAttachments: [{\n        view: context.getCurrentTexture().createView(),\n        clearValue: [0.2, 0.2, 0.2, 1],\n        loadOp: 'clear',\n        storeOp: 'store'\n      }]\n    });\n\n    const props = {\n      vertexCount: n,\n      resolution: [canvas.width, canvas.height]\n    };\n\n    // Draw round joins at bottom\n    drawLinesRound.draw(pass, props, [dataBindGroupRound]);\n\n    // Draw miter joins at top\n    drawLinesMiter.draw(pass, props, [dataBindGroupMiter]);\n\n    pass.end();\n    device.queue.submit([encoder.finish()]);\n  }\n\n  canvas.addEventListener('mousemove', (e) => {\n    scale = [\n      e.offsetX / canvas.clientWidth * 2 - 1,\n      -e.offsetY / canvas.clientHeight * 2 + 1\n    ];\n    render();\n  });\n\n  render();\n  window.addEventListener('resize', render);\n\n  return {\n    render,\n    destroy: () => {\n      drawLinesRound.destroy();\n      drawLinesMiter.destroy();\n    }\n  };\n}";
 hljs.highlightElement(codeEl);
 </script>
 </body>

@@ -1,23 +1,24 @@
 {
-  "name": "webgpu-lines",
+  "name": "webgpu-instanced-lines",
   "version": "0.1.0",
   "description": "GPU-accelerated line rendering for WebGPU with joins and caps",
   "type": "module",
-  "main": "dist/webgpu-lines.esm.js",
-  "module": "dist/webgpu-lines.esm.js",
-  "browser": "dist/webgpu-lines.umd.min.js",
+  "main": "dist/webgpu-instanced-lines.esm.js",
+  "module": "dist/webgpu-instanced-lines.esm.js",
+  "browser": "dist/webgpu-instanced-lines.umd.min.js",
   "exports": {
     ".": {
-      "import": "./dist/webgpu-lines.esm.js",
-      "require": "./dist/webgpu-lines.umd.min.js",
-      "default": "./dist/webgpu-lines.esm.js"
+      "import": "./dist/webgpu-instanced-lines.esm.js",
+      "require": "./dist/webgpu-instanced-lines.umd.min.js",
+      "default": "./dist/webgpu-instanced-lines.esm.js"
     }
   },
   "files": [
     "dist",
-    "webgpu-lines.js"
+    "webgpu-instanced-lines.js"
   ],
   "scripts": {
+    "build:all": "npm run test && npm run build && npm run build:examples && npm run docs:build",
     "build": "rollup -c",
     "build:examples": "node scripts/build-examples.js",
     "prepublishOnly": "npm run build",

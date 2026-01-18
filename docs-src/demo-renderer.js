@@ -6,7 +6,7 @@
  * to a 2D canvas for display.
  */
 
-import { createGPULines } from '../webgpu-lines.js';
+import { createGPULines } from '../webgpu-instanced-lines.js';
 
 /**
  * Create a demo renderer instance
@@ -456,7 +456,6 @@ export function createDemoRenderer(device, context, canvas, format) {
 
     gpuLines.draw(pass, {
       vertexCount: points.length,
-      width: lineWidth,
       resolution: [canvas.width, canvas.height]
     }, [dataBindGroup]);
 
@@ -561,7 +560,6 @@ export function createDemoRenderer(device, context, canvas, format) {
 
     gpuLines.draw(pass, {
       vertexCount: points.length,
-      width: lineWidth,
       resolution: [pixelWidth, pixelHeight]
     }, [dataBindGroup]);
 
