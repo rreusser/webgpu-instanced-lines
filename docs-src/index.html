@@ -55,9 +55,9 @@
   <script id="4" type="text/markdown">
   </script>
   <script id="5" type="module">
-    import { createElementStack } from '../vendor/element-stack.js'
-    import { createZoomableAxes } from '../vendor/zoomable-axes.js'
-    import { expandable } from '../vendor/expandable.js'
+    import { createElementStack } from './element-stack.js'
+    import { createZoomableAxes } from './zoomable-axes.js'
+    import { expandable } from './expandable.js'
 
     const dpr = window.devicePixelRatio || 1;
     const canvasWidth = Math.min(640, width);
@@ -526,7 +526,7 @@
     });
   </script>
   <script id="14" type="module">
-    import { createFrameLoop } from '../vendor/frame-loop.js';
+    import { createFrameLoop } from './frame-loop.js';
 
     lineWidth; debugView; renderState.dirty = true;
 
