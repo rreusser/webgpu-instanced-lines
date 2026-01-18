@@ -30,7 +30,7 @@ Controls how line endpoints are rendered. Options are `'round'`, `'square'`, and
 
 ### `miterLimit`
 
-When using `join: 'miter'`, this controls when sharp angles fall back to bevel joins. Lower values create more bevels. Higher values allow longer miter points. Default is `4`.
+When using `join: 'miter'`, this controls when sharp angles fall back to bevel joins. Lower values create more bevels. Higher values allow longer miter points. Default is `4`. Can be overridden at draw-time.
 
 | `miterLimit: 1` | `miterLimit: 4` | `miterLimit: 10` |
 |:---:|:---:|:---:|
@@ -38,7 +38,11 @@ When using `join: 'miter'`, this controls when sharp angles fall back to bevel j
 
 ### `joinResolution` and `capResolution`
 
-Control the number of triangles used for round joins and caps. Higher values create smoother curves. Default is `8`.
+Control the number of triangles used for round joins and caps. Higher values create smoother curves. Default is `8`. Can be overridden at draw-time (up to the max resolution).
+
+### `maxJoinResolution` and `maxCapResolution`
+
+Maximum resolution values that can be used at draw-time. These determine vertex buffer allocation at init-time. Default is `16`. Set higher if you need finer resolution at draw-time; set lower to reduce vertex count per instance.
 
 | `joinResolution: 2` | `joinResolution: 4` | `joinResolution: 16` |
 |:---:|:---:|:---:|
@@ -161,7 +165,14 @@ Available library uniforms are `uniforms.resolution` (canvas resolution in pixel
 
 ### `gpuLines.draw(pass, props, bindGroups)`
 
-Draws lines in a render pass. The `props` object includes `vertexCount` (number of points in the line) and `resolution` (canvas resolution as `[width, height]`). The `bindGroups` parameter is an array of user bind groups for groups 1, 2, etc.
+Draws lines in a render pass. The `bindGroups` parameter is an array of user bind groups for groups 1, 2, etc.
+
+**Props:**
+- `vertexCount` - Number of points in the line
+- `resolution` - Canvas resolution as `[width, height]`
+- `miterLimit` (optional) - Override miter limit at draw-time (only for `join: 'miter'` or `join: 'round'`)
+- `joinResolution` (optional) - Override join resolution at draw-time (only for `join: 'round'`, clamped to `maxJoinResolution`)
+- `capResolution` (optional) - Override cap resolution at draw-time (only for `cap: 'round'`, clamped to `maxCapResolution`)
 
 ### `gpuLines.getBindGroupLayout(index)`
 

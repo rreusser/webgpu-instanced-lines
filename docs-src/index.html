@@ -376,7 +376,9 @@
     stack.addEventListener('update', updateHandlePositions);
   </script>
   <script id="13" type="module">
-    joinType; joinResolution; miterLimit; capType; capResolution; sdfStrokeWidth; alpha; stripes; varyingWidth; debugView;
+    // Only depend on shader-affecting parameters (join/cap type, shader options)
+    // Resolution and miterLimit are now runtime parameters passed to draw()
+    joinType; capType; sdfStrokeWidth; alpha; stripes; varyingWidth; debugView;
 
     const useSdfMode = sdfStrokeWidth > 0;
     const useBlend = useSdfMode || alpha < 1 || debugView;
@@ -392,6 +394,7 @@
         dpr: f32,
       }
       @group(1) @binding(4) var<uniform> debug: DebugUniforms;
+      @group(1) @binding(5) var<uniform> lineWidthUniform: f32;
 
       struct Vertex {
         position: vec4f,
@@ -406,7 +409,7 @@
         let projected = viewMatrix * vec4f(p.xyz, 1.0);
         // Reference totalDistance to ensure it's included in bind group layout
         let normalizedDist = d / totalDistance;
-        let w = ${varyingWidth ? 'uniforms.width * (0.5 + 1.5 * normalizedDist)' : 'uniforms.width'};
+        let w = ${varyingWidth ? 'lineWidthUniform * (0.5 + 1.5 * normalizedDist)' : 'lineWidthUniform'};
         return Vertex(vec4f(projected.xyz, p.w * projected.w), w, d, w);
       }
     `;
@@ -478,13 +481,14 @@
       }
     `;
 
+    // Use max resolutions at init time to allow runtime adjustment up to these values
+    // Runtime values (miterLimit, joinResolution, capResolution) are passed to draw()
     const gpuLines = createGPULines(device, {
       format: canvasFormat,
       join: joinType,
-      joinResolution: joinResolution,
-      miterLimit: miterLimit,
+      maxJoinResolution: 16,  // Allow up to 16 at runtime
+      maxCapResolution: 16,   // Allow up to 16 at runtime
       cap: capType,
-      capResolution: capResolution,
       vertexShaderBody,
       fragmentShaderBody,
       blend: useBlend ? {
@@ -507,6 +511,13 @@
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
 
+    // Create line width uniform buffer
+    const lineWidthBuffer = device.createBuffer({
+      label: 'line-width-uniform',
+      size: 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
     // Create bind group for user data (group 1)
     const dataBindGroup = device.createBindGroup({
       layout: gpuLines.getBindGroupLayout(1),
@@ -515,20 +526,23 @@
         { binding: 1, resource: { buffer: distanceBuffer } },
         { binding: 2, resource: { buffer: viewMatrixBuffer } },
         { binding: 3, resource: { buffer: totalDistanceBuffer } },
-        { binding: 4, resource: { buffer: debugBuffer } }
+        { binding: 4, resource: { buffer: debugBuffer } },
+        { binding: 5, resource: { buffer: lineWidthBuffer } }
       ]
     });
 
     invalidation.then(() => {
       gpuLines.destroy();
       viewMatrixBuffer.destroy();
+      lineWidthBuffer.destroy();
       debugBuffer.destroy();
     });
   </script>
   <script id="14" type="module">
     import { createFrameLoop } from './frame-loop.js';
 
-    lineWidth; debugView; renderState.dirty = true;
+    // Depend on runtime parameters that don't require pipeline recreation
+    lineWidth; debugView; miterLimit; joinResolution; capResolution; renderState.dirty = true;
 
     const loop = createFrameLoop(() => {
       if (renderState.dirty) {
@@ -541,6 +555,9 @@
         new Float32Array(debugData, 4, 1)[0] = dpr;
         device.queue.writeBuffer(debugBuffer, 0, debugData);
 
+        // Update line width uniform
+        device.queue.writeBuffer(lineWidthBuffer, 0, new Float32Array([lineWidth * dpr]));
+
         const encoder = device.createCommandEncoder();
 
         const pass = encoder.beginRenderPass({
@@ -552,10 +569,14 @@
           }]
         });
 
+        // Pass runtime parameters (miterLimit, joinResolution, capResolution)
+        // These update uniforms without recreating the pipeline
         gpuLines.draw(pass, {
           vertexCount: numPoints,
-          width: lineWidth * dpr,
-          resolution: [canvas.width, canvas.height]
+          resolution: [canvas.width, canvas.height],
+          miterLimit: miterLimit,
+          joinResolution: joinResolution,
+          capResolution: capResolution
         }, [dataBindGroup]);
 
         pass.end();

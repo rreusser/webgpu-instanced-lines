@@ -67,10 +67,12 @@ function findFunctionReturnType(code, functionName) {
  * @param {string} [options.positionField='position'] - Name of position field in vertex struct
  * @param {string} [options.widthField='width'] - Name of width field in vertex struct (optional)
  * @param {string} [options.join='bevel'] - Join type: 'bevel', 'miter', or 'round'
- * @param {number} [options.joinResolution=8] - Resolution for round joins
- * @param {number} [options.miterLimit=4] - Miter limit before switching to bevel
+ * @param {number} [options.joinResolution=8] - Default resolution for round joins (can override at draw-time)
+ * @param {number} [options.maxJoinResolution=16] - Maximum resolution for round joins (determines vertex allocation)
+ * @param {number} [options.miterLimit=4] - Default miter limit before switching to bevel (can override at draw-time)
  * @param {string} [options.cap='round'] - Cap type: 'round', 'square', or 'none'
- * @param {number} [options.capResolution=8] - Resolution for round caps
+ * @param {number} [options.capResolution=8] - Default resolution for round caps (can override at draw-time)
+ * @param {number} [options.maxCapResolution=16] - Maximum resolution for round caps (determines vertex allocation)
  * @param {object} [options.blend] - Optional blend state for alpha blending
  * @param {GPUTextureFormat} [options.depthFormat] - Optional depth format for depth testing (e.g., 'depth24plus')
  */
@@ -83,10 +85,12 @@ export function createGPULines(device, options) {
     positionField = 'position',
     widthField = 'width',
     join = 'bevel',
-    joinResolution = 8,
-    miterLimit = 4,
+    joinResolution: defaultJoinResolution = 8,
+    maxJoinResolution = 16,
+    miterLimit: defaultMiterLimit = 4,
     cap = 'round',
     capResolution: userCapResolution = 8,
+    maxCapResolution = 16,
     blend = null,
     depthFormat = null,
   } = options;
@@ -120,25 +124,42 @@ export function createGPULines(device, options) {
 
   const isRound = join === 'round';
   const isBevel = join === 'bevel';
-  const joinRes2 = isRound ? joinResolution * 2 : 2;
-  const effectiveMiterLimit = isBevel ? 0 : miterLimit;
+  const effectiveMiterLimit = isBevel ? 0 : defaultMiterLimit;
 
   const insertCaps = cap !== 'none';
-  let capResolution;
+
+  // Compute default cap resolution based on cap type
+  let defaultCapResolution;
   if (cap === 'none') {
-    capResolution = 1;
+    defaultCapResolution = 1;
   } else if (cap === 'square') {
-    capResolution = 3;
+    defaultCapResolution = 3;
   } else {
-    capResolution = userCapResolution;
+    defaultCapResolution = userCapResolution;
   }
 
-  const capRes2 = capResolution * 2;
+  // Compute effective max resolutions based on cap type
+  let effectiveMaxCapResolution;
+  if (cap === 'none') {
+    effectiveMaxCapResolution = 1;
+  } else if (cap === 'square') {
+    effectiveMaxCapResolution = 3;
+  } else {
+    effectiveMaxCapResolution = maxCapResolution;
+  }
+
+  // Use MAX resolutions for vertex count calculation (allows runtime values up to max)
+  const maxJoinRes2 = isRound ? maxJoinResolution * 2 : 2;
+  const maxCapRes2 = effectiveMaxCapResolution * 2;
   const capScale = cap === 'square' ? [2, 2 / Math.sqrt(3)] : [1, 1];
 
-  const maxRes = Math.max(capRes2, joinRes2);
+  const maxRes = Math.max(maxCapRes2, maxJoinRes2);
   const vertCnt = maxRes + 3;
   const vertexCountPerInstance = vertCnt * 2;
+
+  // Default values for draw-time (when not overridden)
+  const defaultJoinRes2 = isRound ? defaultJoinResolution * 2 : 2;
+  const defaultCapRes2 = defaultCapResolution * 2;
 
   // Generate shader code
   const vertexShader = createVertexShader({
@@ -228,9 +249,9 @@ export function createGPULines(device, options) {
   const _uniformData = new ArrayBuffer(40);
   const _f32 = new Float32Array(_uniformData);
   const _u32 = new Uint32Array(_uniformData);
-  // Initialize static values that never change
-  _f32[2] = capRes2;
-  _f32[3] = joinRes2;
+  // Initialize values with defaults (some can be overridden at draw-time)
+  _f32[2] = defaultCapRes2;
+  _f32[3] = defaultJoinRes2;
   _f32[4] = effectiveMiterLimit * effectiveMiterLimit;
   _u32[5] = isRound ? 1 : 0;
   _u32[7] = insertCaps ? 1 : 0;
@@ -240,6 +261,9 @@ export function createGPULines(device, options) {
   let _lastPointCount = -1;
   let _lastResX = -1;
   let _lastResY = -1;
+  let _lastCapRes2 = defaultCapRes2;
+  let _lastJoinRes2 = defaultJoinRes2;
+  let _lastMiterLimit2 = effectiveMiterLimit * effectiveMiterLimit;
   let _uniformsWritten = false;
 
   return {
@@ -257,25 +281,62 @@ export function createGPULines(device, options) {
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
      * @param {Array<number>} props.resolution - [width, height] of render target
+     * @param {number} [props.miterLimit] - Override miter limit (only applies if join is 'miter' or 'round')
+     * @param {number} [props.joinResolution] - Override join resolution (only applies if join is 'round')
+     * @param {number} [props.capResolution] - Override cap resolution (only applies if cap is 'round')
      */
     updateUniforms(props) {
       const { vertexCount: pointCount, resolution } = props;
+
+      // Compute effective resolution values (clamped to max)
+      let capRes2 = defaultCapRes2;
+      if (cap === 'round' && props.capResolution !== undefined) {
+        const clampedCapRes = Math.min(props.capResolution, maxCapResolution);
+        if (props.capResolution > maxCapResolution) {
+          console.warn(`capResolution ${props.capResolution} exceeds maxCapResolution ${maxCapResolution}, clamping to ${maxCapResolution}`);
+        }
+        capRes2 = clampedCapRes * 2;
+      }
+
+      let joinRes2 = defaultJoinRes2;
+      if (isRound && props.joinResolution !== undefined) {
+        const clampedJoinRes = Math.min(props.joinResolution, maxJoinResolution);
+        if (props.joinResolution > maxJoinResolution) {
+          console.warn(`joinResolution ${props.joinResolution} exceeds maxJoinResolution ${maxJoinResolution}, clamping to ${maxJoinResolution}`);
+        }
+        joinRes2 = clampedJoinRes * 2;
+      }
+
+      // Compute effective miter limit (isBevel forces it to 0)
+      let miterLimit2 = _lastMiterLimit2;
+      if (!isBevel && props.miterLimit !== undefined) {
+        miterLimit2 = props.miterLimit * props.miterLimit;
+      }
 
       // Only write if values changed
       const needsUpdate = !_uniformsWritten ||
         pointCount !== _lastPointCount ||
         resolution[0] !== _lastResX ||
-        resolution[1] !== _lastResY;
+        resolution[1] !== _lastResY ||
+        capRes2 !== _lastCapRes2 ||
+        joinRes2 !== _lastJoinRes2 ||
+        miterLimit2 !== _lastMiterLimit2;
 
       if (needsUpdate) {
         _f32[0] = resolution[0];
         _f32[1] = resolution[1];
+        _f32[2] = capRes2;
+        _f32[3] = joinRes2;
+        _f32[4] = miterLimit2;
         _u32[6] = pointCount;
         device.queue.writeBuffer(uniformBuffer, 0, _uniformData);
 
         _lastPointCount = pointCount;
         _lastResX = resolution[0];
         _lastResY = resolution[1];
+        _lastCapRes2 = capRes2;
+        _lastJoinRes2 = joinRes2;
+        _lastMiterLimit2 = miterLimit2;
         _uniformsWritten = true;
       }
     },
@@ -286,6 +347,9 @@ export function createGPULines(device, options) {
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
      * @param {Array<number>} props.resolution - [width, height] of render target
+     * @param {number} [props.miterLimit] - Override miter limit (only applies if join is 'miter' or 'round')
+     * @param {number} [props.joinResolution] - Override join resolution (only applies if join is 'round')
+     * @param {number} [props.capResolution] - Override cap resolution (only applies if cap is 'round')
      * @param {boolean} [props.skipUniformUpdate] - Skip uniform update (call updateUniforms first)
      * @param {Array<GPUBindGroup>} [bindGroups] - User bind groups for groups 1, 2, etc.
      */
