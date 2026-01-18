@@ -5,13 +5,15 @@ import { debugNotebook } from "@rreusser/mcp-observable-notebookkit-debug";
 export default defineConfig({
   ...config(),
   plugins: [debugNotebook(), observable()],
-  root: "docs",
+  root: "docs-src",
+  build: {
+    target: "esnext",
+    outDir: "../docs",
+    emptyOutDir: false,
+  },
   optimizeDeps: {
     esbuildOptions: {
       target: "esnext",
     },
-  },
-  build: {
-    target: "esnext",
   },
 });

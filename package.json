@@ -24,7 +24,7 @@
     "test": "node test/run-tests.js",
     "test:update": "node test/run-tests.js --update",
     "docs:preview": "vite",
-    "docs:build": "notebooks build --root docs -- docs/*.html"
+    "docs:build": "vite build"
   },
   "keywords": [
     "webgpu",
