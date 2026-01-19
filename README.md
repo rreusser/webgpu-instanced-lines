@@ -1,6 +1,6 @@
 # WebGPU Instanced Lines
 
-![foo](./docs/images/lines.png)
+![lines](https://raw.githubusercontent.com/rreusser/webgpu-instanced-lines/main/docs/images/lines.png)
 
 High-performance, flexible GPU-accelerated line rendering for WebGPU. A direct port of [regl-gpu-lines](https://github.com/rreusser/regl-gpu-lines) to WebGPU.
 
@@ -90,6 +90,7 @@ See the [examples](examples/) directory for working examples. Each demonstrates 
 - [**dash**](https://rreusser.github.io/webgpu-instanced-lines/dash.html) - Dashing with cumulative distance tracking
 - [**multiple**](https://rreusser.github.io/webgpu-instanced-lines/multiple.html) - Multiple separate lines with line breaks
 - [**depth**](https://rreusser.github.io/webgpu-instanced-lines/depth.html) - Blended closed loop with transparency
+- [**msaa**](https://rreusser.github.io/webgpu-instanced-lines/msaa.html) - 4x multi-sample anti-aliasing
 - [**lorenz**](https://rreusser.github.io/webgpu-instanced-lines/lorenz.html) - A strange attractor, iterated in a compute shader, with vertex positions computed from buffer lookups and rendered in a single draw call
 
 ## License

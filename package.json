@@ -1,6 +1,6 @@
 {
   "name": "webgpu-instanced-lines",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "GPU-accelerated line rendering for WebGPU with joins and caps",
   "type": "module",
   "main": "dist/webgpu-instanced-lines.esm.js",
