@@ -73,6 +73,7 @@ function findFunctionReturnType(code, functionName) {
  * @param {number} [options.maxCapResolution=16] - Max/default resolution for round caps (determines vertex allocation)
  * @param {object} [options.blend] - Optional blend state for alpha blending
  * @param {GPUTextureFormat} [options.depthFormat] - Optional depth format for depth testing (e.g., 'depth24plus')
+ * @param {string} [options.cullMode='none'] - Face culling mode: 'none', 'front', or 'back'
  */
 export function createGPULines(device, options) {
   const {
@@ -91,6 +92,7 @@ export function createGPULines(device, options) {
     maxCapResolution = 16,
     blend = null,
     depthFormat = null,
+    cullMode = 'none',
   } = options;
 
   // Parse user's vertex struct to find varyings
@@ -200,7 +202,8 @@ export function createGPULines(device, options) {
     },
     primitive: {
       topology: 'triangle-strip',
-      stripIndexFormat: undefined
+      stripIndexFormat: undefined,
+      cullMode
     }
   };
 

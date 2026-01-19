@@ -134,6 +134,14 @@ createGPULines(device, {
 });
 ```
 
+### `depthFormat`
+
+Enable depth testing by specifying a depth format (e.g., `'depth24plus'`). When enabled, you must also provide a depth attachment in your render pass.
+
+### `cullMode`
+
+Face culling mode: `'none'` (default), `'front'`, or `'back'`. Back-face culling can be useful for validation and debugging.
+
 ### `vertexShaderBody`
 
 The vertex shader body defines how line positions and per-vertex data are computed. You provide bind group declarations (group 1+) for your data, a struct defining the vertex output, and a vertex function that returns the struct given a point index.

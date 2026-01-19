@@ -52,6 +52,7 @@ The renderer uses **instanced rendering** with triangle strips. For a line with 
 The geometry is carefully generated to optimize for high-performance rendering without the full rigor of stroke expansion algorithms, which handle self-intersection more carefully. The `lineCoord` varying is constructed so that `length(lineCoord)` gives consistent radial distance from the line center across both segments and caps, permitting uniform stroke widths.
 
 ### Features
+
 - Instanced rendering with triangle strips
 - Screen-projected lines using a custom vertex function that can read geometry from buffers, textures, or procedural computation
 - Bevel, miter, and round joins
@@ -62,9 +63,11 @@ The geometry is carefully generated to optimize for high-performance rendering w
 ### Limitations
 
 - Does not apply special handling for self-intersecting lines.
+- Does not implement dashed lines (though you can compute a line distance attribute and implement dashes)
+- Does not implement stroke borders (though it exposes `lineCoord` to make it straightforward)
+- World-space line widths require custom computation in the vertex shader function.
 - Does not implement [`arcs`](https://www.w3.org/TR/svg-strokes/#CurvatureCalculation) end cap type.
 - Rapidly varying line widths render incorrectly.
-- World-space line widths require custom computation in the vertex shader function.
 
 ## API Reference
 

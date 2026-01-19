@@ -161,6 +161,12 @@
 
     const debugViewInput = Inputs.toggle({ label: 'Debug view', value: 'Debug view' });
     const debugView = view(debugViewInput);
+
+    const depthTestInput = Inputs.toggle({ label: 'Depth test' });
+    const depthTest = view(depthTestInput);
+
+    const cullBackFacesInput = Inputs.toggle({ label: 'Cull back faces' });
+    const cullBackFaces = view(cullBackFacesInput);
   </script>
   <script id="7" type="module">
     const miterLimitInput = Inputs.range([1, 10], {
@@ -204,6 +210,8 @@
       ${stripesInput}
       ${varyingWidthInput}
       ${debugViewInput}
+      ${depthTestInput}
+      ${cullBackFacesInput}
     </div>`);
   </script>
   <script id="11" type="module">
@@ -378,10 +386,11 @@
   <script id="13" type="module">
     // Only depend on shader-affecting parameters (join/cap type, shader options)
     // Resolution and miterLimit are now runtime parameters passed to draw()
-    joinType; capType; sdfStrokeWidth; alpha; stripes; varyingWidth; debugView;
+    joinType; capType; sdfStrokeWidth; alpha; stripes; varyingWidth; debugView; depthTest; cullBackFaces;
 
     const useSdfMode = sdfStrokeWidth > 0;
     const useBlend = useSdfMode || alpha < 1 || debugView;
+    const depthFormat = depthTest ? 'depth24plus' : null;
 
     // Vertex shader body with position buffer, distance buffer, and view matrix
     const vertexShaderBody = /* wgsl */`
@@ -494,7 +503,9 @@
       blend: useBlend ? {
         color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
         alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
-      } : null
+      } : null,
+      depthFormat,
+      cullMode: cullBackFaces ? 'back' : 'none'
     });
 
     // Create view matrix buffer
@@ -544,6 +555,11 @@
     // Depend on runtime parameters that don't require pipeline recreation
     lineWidth; debugView; miterLimit; joinResolution; capResolution; renderState.dirty = true;
 
+    // Depth texture for depth testing (created lazily, resized as needed)
+    let depthTexture = null;
+    let depthTextureWidth = 0;
+    let depthTextureHeight = 0;
+
     const loop = createFrameLoop(() => {
       if (renderState.dirty) {
         // Update view matrix buffer
@@ -558,16 +574,42 @@
         // Update line width uniform
         device.queue.writeBuffer(lineWidthBuffer, 0, new Float32Array([lineWidth * dpr]));
 
+        // Create/resize depth texture if depth testing is enabled
+        if (depthFormat) {
+          if (!depthTexture || depthTextureWidth !== canvas.width || depthTextureHeight !== canvas.height) {
+            if (depthTexture) depthTexture.destroy();
+            depthTexture = device.createTexture({
+              size: [canvas.width, canvas.height],
+              format: depthFormat,
+              usage: GPUTextureUsage.RENDER_ATTACHMENT
+            });
+            depthTextureWidth = canvas.width;
+            depthTextureHeight = canvas.height;
+          }
+        }
+
         const encoder = device.createCommandEncoder();
 
-        const pass = encoder.beginRenderPass({
+        const renderPassDescriptor = {
           colorAttachments: [{
             view: gpuContext.getCurrentTexture().createView(),
             loadOp: 'clear',
             storeOp: 'store',
             clearValue: { r: 1.0, g: 1.0, b: 1.0, a: 1 }
           }]
-        });
+        };
+
+        // Add depth attachment if depth testing is enabled
+        if (depthFormat && depthTexture) {
+          renderPassDescriptor.depthStencilAttachment = {
+            view: depthTexture.createView(),
+            depthClearValue: 1.0,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store'
+          };
+        }
+
+        const pass = encoder.beginRenderPass(renderPassDescriptor);
 
         // Pass runtime parameters (miterLimit, joinResolution, capResolution)
         // These update uniforms without recreating the pipeline
@@ -585,7 +627,10 @@
       }
     });
 
-    invalidation.then(() => loop.cancel());
+    invalidation.then(() => {
+      loop.cancel();
+      if (depthTexture) depthTexture.destroy();
+    });
   </script>
   <script id="14b" type="text/markdown">
     ---
