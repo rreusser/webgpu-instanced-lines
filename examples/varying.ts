@@ -1,5 +1,5 @@
-// Variable width example: Line width that varies along the path
-// Demonstrates a tapered stroke that goes from thin to thick to thin
+// Varying example: Pass custom interpolated values to the fragment shader
+// Demonstrates coloring a spiral by progress along the path
 
 import { createGPULines } from '../webgpu-instanced-lines';
 
@@ -12,15 +12,15 @@ export async function init(canvas: HTMLCanvasElement) {
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'premultiplied' });
 
-  // Create a gentle S-curve path
-  const n = 81;
+  // Create a spiral path
+  const n = 120;
   const positions = new Float32Array(n * 4);
   for (let i = 0; i < n; i++) {
     const t = i / (n - 1);
-    const x = (t * 2.0 - 1.0) * 0.85;
-    const y = 0.3 * Math.sin(t * Math.PI * 2);
-    positions[i * 4 + 0] = x;
-    positions[i * 4 + 1] = y;
+    const angle = t * Math.PI * 4;
+    const r = 0.15 + t * 0.55;
+    positions[i * 4 + 0] = r * Math.cos(angle);
+    positions[i * 4 + 1] = r * Math.sin(angle);
     positions[i * 4 + 2] = 0;
     positions[i * 4 + 3] = 1;
   }
@@ -41,23 +41,22 @@ export async function init(canvas: HTMLCanvasElement) {
       struct Vertex {
         position: vec4f,
         width: f32,
+        t: f32, // progress along path (0 to 1)
       }
 
       fn getVertex(index: u32) -> Vertex {
         let p = positions[index];
-        // Normalize t from 0 to 1 based on x position
-        let t = p.x * 0.5 + 0.5;
-        // Tapered width: thin at ends, thick in middle (like a brush stroke)
-        let taper = sin(t * 3.14159265);
-        let baseWidth = 60.0 * ${devicePixelRatio.toFixed(1)};
-        let minWidth = 4.0 * ${devicePixelRatio.toFixed(1)};
-        let w = minWidth + (baseWidth - minWidth) * taper;
-        return Vertex(p, w);
+        let t = f32(index) / ${(n - 1).toFixed(1)};
+        return Vertex(p, 20.0 * ${devicePixelRatio.toFixed(1)}, t);
       }
     `,
     fragmentShaderBody: /* wgsl */`
-      fn getColor(lineCoord: vec2f) -> vec4f {
-        return vec4f(0.2, 0.6, 0.9, 1.0);
+      fn getColor(lineCoord: vec2f, t: f32) -> vec4f {
+        // Gradient from magenta (start) to cyan (end)
+        let startColor = vec3f(0.9, 0.2, 0.6);
+        let endColor = vec3f(0.2, 0.8, 0.9);
+        let color = mix(startColor, endColor, t);
+        return vec4f(color, 1.0);
       }
     `,
   });
@@ -72,7 +71,7 @@ export async function init(canvas: HTMLCanvasElement) {
     const pass = encoder.beginRenderPass({
       colorAttachments: [{
         view: context.getCurrentTexture().createView(),
-        clearValue: [0.15, 0.15, 0.18, 1],
+        clearValue: [0.12, 0.12, 0.15, 1],
         loadOp: 'clear',
         storeOp: 'store'
       }]
