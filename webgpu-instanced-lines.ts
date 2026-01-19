@@ -672,7 +672,7 @@ fn vertexMain(
   //----------------------------------------------------------------------------
   // Mirror swap: reverse perspective for second half of triangle strip
   //----------------------------------------------------------------------------
-  // The key insight: we can reuse the same geometry computation for both halves
+  // We reuse the same geometry computation for both halves
   // of the triangle strip by swapping the point labels. When mirrored:
   //   - B becomes C, C becomes B (swap segment endpoints)
   //   - A becomes D, D becomes A (swap the neighboring points)

@@ -104,7 +104,7 @@ Where:
 
 With the default `maxJoinResolution = 16` and `maxCapResolution = 16`, round geometry uses 70 vertices per instance.
 
-**Key takeaway:** If you don't need round joins or caps, you can set `maxJoinResolution` and `maxCapResolution` to any value without affecting performance. Only round geometry uses the resolution settings to determine vertex count.
+If you don't need round joins or caps, you can set `maxJoinResolution` and `maxCapResolution` to any value without affecting performance. Only round geometry uses the resolution settings to determine vertex count.
 
 ### Line Breaks
 
@@ -254,17 +254,3 @@ fn getColor(lineCoord: vec2f) -> vec4f {
   return vec4f(color, aa);
 }
 ```
-
-When using transparency or `discard`, enable alpha blending.
-```javascript
-createGPULines(device, {
-  colorTargets: {
-    format: canvasFormat,
-    blend: {
-      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
-    }
-  }
-});
-```
-

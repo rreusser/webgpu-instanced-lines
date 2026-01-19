@@ -865,6 +865,12 @@ ${getSection(apiMd, '`createGPULines(device, options)`')}
       await demoRenderer.renderToCanvas(res16, { ...baseOpts, joinResolution: 16 });
     }
   </script>
+  <script id="25b" type="module">
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
+
+    display(md`${getSectionWithHeading(apiMd, 'Performance: Vertices Per Instance', 3)}`);
+  </script>
   <script id="26" type="module">
     import apiMd from './API.md?raw';
     import { getSectionWithHeading } from './lib/markdown-sections.js';
@@ -895,6 +901,12 @@ ${getSection(apiMd, '`createGPULines(device, options)`')}
       await demoRenderer.renderToCanvas(withBreak, { ...baseOpts, lineBreak: true });
     }
   </script>
+  <script id="27b" type="module">
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
+
+    display(md`${getSectionWithHeading(apiMd, 'Drawing', 2)}`);
+  </script>
   <script id="28" type="module">
     import apiMd from './API.md?raw';
     import { getSection } from './lib/markdown-sections.js';
@@ -909,6 +921,12 @@ ${getSection(apiMd, '`createGPULines(device, options)`')}
 
 ${customShadersIntro}
 `);
+  </script>
+  <script id="28b" type="module">
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
+
+    display(md`${getSectionWithHeading(apiMd, '`vertexShaderBody`')}`);
   </script>
   <script id="29" type="module">
     import apiMd from './API.md?raw';
@@ -1039,18 +1057,6 @@ ${customShadersIntro}
       await demoRenderer.renderToCanvas(gradient, { ...baseOpts, lineWidth: 50, fragmentShaderBody: shaderGradient });
       await demoRenderer.renderToCanvas(sdfStroke, { ...baseOpts, lineWidth: 50, fragmentShaderBody: shaderSDF, blend });
     }
-  </script>
-  <script id="34" type="module">
-    import apiMd from './API.md?raw';
-    import { getSectionWithHeading } from './lib/markdown-sections.js';
-
-    display(md`${getSectionWithHeading(apiMd, '`vertexShaderBody`')}`);
-  </script>
-  <script id="35" type="module">
-    import apiMd from './API.md?raw';
-    import { getSectionWithHeading } from './lib/markdown-sections.js';
-
-    display(md`${getSectionWithHeading(apiMd, 'Drawing', 2)}`);
   </script>
   <script id="37" type="text/markdown">
     ---
