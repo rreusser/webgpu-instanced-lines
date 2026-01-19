@@ -1,0 +1,23 @@
+# Documentation
+docs/
+_site/
+
+# Tests
+test/
+
+# Build configuration
+build/
+tsconfig.json
+eslint.config.js
+
+# Examples
+examples/
+
+# Development files
+.claude/
+.notebookkit-debug/
+.mcp.json
+vendor/
+
+# Source (dist contains built files)
+webgpu-instanced-lines.ts
