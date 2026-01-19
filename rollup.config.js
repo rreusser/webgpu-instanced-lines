@@ -1,4 +1,5 @@
 import terser from '@rollup/plugin-terser';
+import minifyWGSL from './rollup-plugin-minify-wgsl.js';
 
 export default [
   // ESM build (unminified)
@@ -18,7 +19,7 @@ export default [
       format: 'esm',
       sourcemap: true
     },
-    plugins: [terser()]
+    plugins: [minifyWGSL(), terser()]
   },
   // UMD build (minified) for browser <script> tag
   {
@@ -29,6 +30,6 @@ export default [
       name: 'WebGPUInstancedLines',
       sourcemap: true
     },
-    plugins: [terser()]
+    plugins: [minifyWGSL(), terser()]
   }
 ];

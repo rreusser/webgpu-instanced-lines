@@ -694,15 +694,16 @@ fn vertexMain(
   //----------------------------------------------------------------------------
   // Compute the miter vector at B
   //----------------------------------------------------------------------------
-  // The miter vector points outward from the join, bisecting the angle between
-  // the incoming and outgoing normals. Its length determines the miter extension.
+  // The miter vector bisects the angle between the incoming and outgoing normals,
+  // pointing toward the OUTSIDE of the turn (where join geometry fills the gap).
   //
-  //         \  miter  /
-  //          \   ↑   /
-  //           \  |  /
-  //    nAB ←---\-|-/---→ nBC
-  //             \|/
-  //              B
+  //              A                      nAB always points "left" of segment
+  //              |                      nBC always points "left" of segment
+  //         nAB ←|                      miter = average, flipped by dirB to
+  //              |   ↖ miter                   point toward outside of turn
+  //              B---------→ C
+  //                   ↑
+  //                  nBC
   //
   // For hairpin turns (180°), use -tBC as miter (perpendicular to the "fold")
   var miter = select(0.5 * (nAB + nBC) * dirB, -tBC, bIsHairpin);
