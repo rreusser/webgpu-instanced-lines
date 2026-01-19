@@ -47,7 +47,7 @@
   </script>
   <script id="3" type="module">
     // Initialize offscreen demo renderer for static examples
-    import { initDemoRenderer } from './demo-renderer.js';
+    import { initDemoRenderer } from './lib/demo-renderer.js';
 
     const demoRenderer = await initDemoRenderer();
     invalidation.then(() => demoRenderer.destroy());
@@ -55,9 +55,9 @@
   <script id="4" type="text/markdown">
   </script>
   <script id="5" type="module">
-    import { createElementStack } from './element-stack.js'
-    import { createZoomableAxes } from './zoomable-axes.js'
-    import { expandable } from './expandable.js'
+    import { createElementStack } from './lib/element-stack.js'
+    import { createZoomableAxes } from './lib/zoomable-axes.js'
+    import { expandable } from './lib/expandable.js'
 
     const dpr = window.devicePixelRatio || 1;
     const canvasWidth = Math.min(640, width);
@@ -554,7 +554,7 @@
     });
   </script>
   <script id="14" type="module">
-    import { createFrameLoop } from './frame-loop.js';
+    import { createFrameLoop } from './lib/frame-loop.js';
 
     // Depend on runtime parameters that don't require pipeline recreation
     lineWidth; debugView; miterLimit; joinResolution; capResolution; renderState.dirty = true;
@@ -684,7 +684,7 @@
   </script>
   <script id="15" type="module">
     import readmeMd from '../README.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     // Get How It Works section from README, which includes Features and Limitations
     const howItWorks = getSectionWithHeading(readmeMd, 'How It Works', 2);
@@ -707,8 +707,8 @@ Within each instance, a vertex index (0 to ~30, depending on join/cap resolution
 ${additionalContent}`);
   </script>
   <script id="16" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSection, getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSection, getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`---
 
@@ -722,8 +722,8 @@ ${getSection(apiMd, '`createGPULines(device, options)`')}
 `);
   </script>
   <script id="18" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, '`join`')}`);
   </script>
@@ -758,8 +758,8 @@ ${getSection(apiMd, '`createGPULines(device, options)`')}
     }
   </script>
   <script id="20" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, '`cap`')}`);
   </script>
@@ -794,8 +794,8 @@ ${getSection(apiMd, '`createGPULines(device, options)`')}
     }
   </script>
   <script id="22" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, '`miterLimit`')}`);
   </script>
@@ -830,8 +830,8 @@ ${getSection(apiMd, '`createGPULines(device, options)`')}
     }
   </script>
   <script id="24" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, '`joinResolution` and `capResolution`')}`);
   </script>
@@ -866,8 +866,8 @@ ${getSection(apiMd, '`createGPULines(device, options)`')}
     }
   </script>
   <script id="26" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, 'Line Breaks', 3)}`);
   </script>
@@ -896,8 +896,8 @@ ${getSection(apiMd, '`createGPULines(device, options)`')}
     }
   </script>
   <script id="28" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSection } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSection } from './lib/markdown-sections.js';
 
     // Get just the intro paragraph (content before first ### subsection)
     const customShadersIntro = getSection(apiMd, 'Custom Shaders', 2)
@@ -911,14 +911,14 @@ ${customShadersIntro}
 `);
   </script>
   <script id="29" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, '`fragmentShaderBody`')}`);
   </script>
   <script id="30" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, '`lineCoord` Values')}`);
   </script>
@@ -963,8 +963,8 @@ ${customShadersIntro}
     }
   </script>
   <script id="32" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, 'Example Shaders')}`);
   </script>
@@ -1041,14 +1041,14 @@ ${customShadersIntro}
     }
   </script>
   <script id="34" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, '`vertexShaderBody`')}`);
   </script>
   <script id="35" type="module">
-    import apiMd from '../API.md?raw';
-    import { getSectionWithHeading } from './markdown-sections.js';
+    import apiMd from './API.md?raw';
+    import { getSectionWithHeading } from './lib/markdown-sections.js';
 
     display(md`${getSectionWithHeading(apiMd, 'Drawing', 2)}`);
   </script>

@@ -13,13 +13,13 @@ npm install webgpu-instanced-lines
 ## Usage
 
 ```javascript
-import { createGPULines } from 'webgpu-instanced-lines';
+import { createGPULines } from "webgpu-instanced-lines";
 
 const gpuLines = createGPULines(device, {
   format: canvasFormat,
-  join: 'round',
-  cap: 'round',
-  vertexShaderBody: /* wgsl */`
+  join: "round",
+  cap: "round",
+  vertexShaderBody: /* wgsl */ `
     @group(1) @binding(0) var<storage, read> positions: array<vec4f>;
 
     struct Vertex {
@@ -31,19 +31,27 @@ const gpuLines = createGPULines(device, {
       return Vertex(positions[index], 20.0 * ${devicePixelRatio.toFixed(1)});
     }
   `,
-  fragmentShaderBody: /* wgsl */`
+  fragmentShaderBody: /* wgsl */ `
     fn getColor(lineCoord: vec2f) -> vec4f {
       return vec4f(0.2, 0.5, 0.9, 1.0);
     }
-  `
+  `,
 });
 
 // In render loop:
-gpuLines.draw(pass, {
-  vertexCount: numPoints,
-  resolution: [canvas.width, canvas.height]
-}, [dataBindGroup]);
+gpuLines.draw(
+  pass,
+  {
+    vertexCount: numPoints,
+    resolution: [canvas.width, canvas.height],
+  },
+  [dataBindGroup],
+);
 ```
+
+## API Reference
+
+See [docs/API.md](docs/API.md) for full API documentation.
 
 ## How It Works
 
@@ -68,10 +76,6 @@ The geometry is carefully generated to optimize for high-performance rendering w
 - World-space line widths require custom computation in the vertex shader function.
 - Does not implement [`arcs`](https://www.w3.org/TR/svg-strokes/#CurvatureCalculation) end cap type.
 - Rapidly varying line widths render incorrectly.
-
-## API Reference
-
-See [docs/API.md](docs/API.md) for full API documentation.
 
 ## Examples
 

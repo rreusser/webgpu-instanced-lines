@@ -1,7 +1,7 @@
 import { observable, config } from "@observablehq/notebook-kit/vite";
 import { defineConfig } from "vite";
 import { debugNotebook } from "@rreusser/mcp-observable-notebookkit-debug";
-import { copyFileSync, cpSync, existsSync, mkdirSync } from "fs";
+import { cpSync, existsSync } from "fs";
 import { resolve } from "path";
 
 function copyStaticAssets() {
@@ -16,13 +16,6 @@ function copyStaticAssets() {
       const imagesDest = resolve(outDir, "images");
       if (existsSync(imagesSource)) {
         cpSync(imagesSource, imagesDest, { recursive: true });
-      }
-
-      // Copy API.md from root
-      const apiSource = resolve(rootDir, "API.md");
-      const apiDest = resolve(outDir, "API.md");
-      if (existsSync(apiSource)) {
-        copyFileSync(apiSource, apiDest);
       }
     }
   };
