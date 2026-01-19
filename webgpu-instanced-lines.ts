@@ -40,7 +40,7 @@ export interface GPULinesOptions {
   positionField?: string;
   /** Name of width field in vertex struct (default: 'width') */
   widthField?: string;
-  /** Join type: 'bevel', 'miter', or 'round' (default: 'bevel') */
+  /** Join type: 'bevel', 'miter', or 'round' (default: 'miter') */
   join?: JoinType;
   /** Default join resolution (default: 8) */
   joinResolution?: number;
@@ -48,7 +48,7 @@ export interface GPULinesOptions {
   maxJoinResolution?: number;
   /** Default miter limit before switching to bevel (default: 4) */
   miterLimit?: number;
-  /** Cap type: 'round', 'square', or 'butt' (default: 'round') */
+  /** Cap type: 'round', 'square', or 'butt' (default: 'square') */
   cap?: CapType;
   /** Default cap resolution (default: 8) */
   capResolution?: number;
@@ -98,11 +98,9 @@ export interface GPULines {
 interface VertexShaderOptions {
   userCode: string;
   vertexFunction: string;
-  returnType: string;
   positionField: string;
   widthField: string;
   varyings: StructField[];
-  isRound: boolean;
 }
 
 /** Internal options for creating fragment shader */
@@ -160,12 +158,10 @@ export function createGPULines(device: GPUDevice, options: GPULinesOptions): GPU
     vertexFunction = 'getVertex',
     positionField = 'position',
     widthField = 'width',
-    join = 'bevel',
-    joinResolution: defaultJoinResolution = 8,
+    join = 'miter',
     maxJoinResolution = 16,
     miterLimit: defaultMiterLimit = 4,
-    cap = 'round',
-    capResolution: userCapResolution = 8,
+    cap = 'square',
     maxCapResolution = 16,
     blend = null,
     depthFormat = null,
@@ -228,20 +224,15 @@ export function createGPULines(device: GPUDevice, options: GPULinesOptions): GPU
   const vertexShader = createVertexShader({
     userCode: vertexShaderBody,
     vertexFunction,
-    returnType,
     positionField,
     widthField,
     varyings,
-    isRound,
   });
 
   const fragmentShader = createFragmentShader({
     userCode: fragmentShaderBody,
     varyings,
   });
-
-  // Count user varyings for debug varying locations
-  const debugVaryingStartLocation = varyings.length + 1; // +1 for lineCoord at location 0
 
   // Create shader modules
   const vertexModule = device.createShaderModule({
@@ -252,16 +243,6 @@ export function createGPULines(device: GPUDevice, options: GPULinesOptions): GPU
   const fragmentModule = device.createShaderModule({
     label: 'gpu-lines-fragment',
     code: fragmentShader
-  });
-
-  // Create bind group layout for library uniforms only (group 0)
-  const uniformBindGroupLayout = device.createBindGroupLayout({
-    label: 'gpu-lines-uniforms',
-    entries: [{
-      binding: 0,
-      visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-      buffer: { type: 'uniform' }
-    }]
   });
 
   // Use 'auto' layout so user's bind groups are inferred from shader
@@ -427,11 +408,9 @@ export function createGPULines(device: GPUDevice, options: GPULinesOptions): GPU
 function createVertexShader({
   userCode,
   vertexFunction,
-  returnType,
   positionField,
   widthField,
   varyings,
-  isRound,
 }: VertexShaderOptions): string {
   // Generate varying declarations for VertexOutput
   const varyingOutputDecls = varyings.map((v, i) =>
