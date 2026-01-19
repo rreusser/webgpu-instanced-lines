@@ -1445,12 +1445,27 @@ p .plot-d6a7b5 {
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
     </style>
-  <meta name="generator" content="Observable Notebook Kit v1.5.1"><title>WebGPU Instanced Lines</title>  <script type="module" crossorigin src="./assets/index-CyMwrN7b.js"></script>
+  <meta name="generator" content="Observable Notebook Kit v1.5.1"><title>WebGPU Instanced Lines</title>  <script type="module" crossorigin src="./assets/index-Bjthc_N_.js"></script>
 </head>
   <body>
-    <main><div id="cell-1" class="observablehq observablehq--cell"></div><div id="cell-2" class="observablehq observablehq--cell"><div><h1>WebGPU Instanced Lines</h1>
-<p>High-performance, flexible GPU-accelerated line rendering for WebGPU. This is a direct port of <a href="https://github.com/rreusser/regl-gpu-lines">regl-gpu-lines</a> to WebGPU. The focus is on speed and customizability rather than sophisticated stroke expansion algorithms. Drag handles to edit vertices, drag the background to pan, and scroll to zoom. Enable <strong>Debug view</strong> to see the underlying triangle strip structure.</p>
-</div></div><div id="cell-3" class="observablehq observablehq--cell"></div><div id="cell-4" class="observablehq observablehq--cell"></div><div id="cell-5" class="observablehq observablehq--cell"><div></div></div><div id="cell-6" class="observablehq observablehq--cell"></div><div id="cell-7" class="observablehq observablehq--cell"></div><div id="cell-8" class="observablehq observablehq--cell"></div><div id="cell-9" class="observablehq observablehq--cell"></div><div id="cell-10" class="observablehq observablehq--cell"></div><div id="cell-11" class="observablehq observablehq--cell"></div><div id="cell-12" class="observablehq observablehq--cell"></div><div id="cell-13" class="observablehq observablehq--cell"></div><div id="cell-14" class="observablehq observablehq--cell"></div><div id="cell-15" class="observablehq observablehq--cell"></div><div id="cell-16" class="observablehq observablehq--cell"><div><hr>
+    <main><div id="cell-1" class="observablehq observablehq--cell"></div><div id="cell-2" class="observablehq observablehq--cell"></div><div id="cell-3" class="observablehq observablehq--cell"><div><h1>WebGPU Instanced Lines</h1>
+<p>High-performance, flexible GPU-accelerated line rendering for WebGPU. This is a direct port of <a href="https://github.com/rreusser/regl-gpu-lines">regl-gpu-lines</a> to WebGPU. The focus is on speed and customizability rather than sophisticated stroke expansion algorithms.</p>
+<p><strong>Contents</strong></p>
+<ul>
+<li><a href="#installation">Installation</a></li>
+<li><a href="#usage">Usage</a></li>
+<li><a href="#how-it-works">How It Works</a></li>
+<li><a href="#api-reference">API Reference</a>
+<ul>
+<li><a href="#options">Options</a></li>
+<li><a href="#drawing">Drawing</a></li>
+<li><a href="#custom-shaders">Custom Shaders</a></li>
+</ul>
+</li>
+</ul>
+<h2 id="interactive-demo" tabindex="-1"><a href="#interactive-demo">Interactive demo</a></h2>
+<p>The visualization below shows basic line rendering with debug visualizations when <strong>Debug view</strong> is enabled.</p>
+</div></div><div id="cell-4" class="observablehq observablehq--cell"></div><div id="cell-5" class="observablehq observablehq--cell"></div><div id="cell-6" class="observablehq observablehq--cell"><div></div></div><div id="cell-7" class="observablehq observablehq--cell"></div><div id="cell-8" class="observablehq observablehq--cell"></div><div id="cell-9" class="observablehq observablehq--cell"></div><div id="cell-10" class="observablehq observablehq--cell"></div><div id="cell-11" class="observablehq observablehq--cell"></div><div id="cell-12" class="observablehq observablehq--cell"></div><div id="cell-13" class="observablehq observablehq--cell"></div><div id="cell-14" class="observablehq observablehq--cell"></div><div id="cell-15" class="observablehq observablehq--cell"></div><div id="cell-16" class="observablehq observablehq--cell"></div><div id="cell-17" class="observablehq observablehq--cell"></div><div id="cell-18" class="observablehq observablehq--cell"><div><hr>
 <h2 id="installation" tabindex="-1"><a href="#installation">Installation</a></h2>
 <pre data-language="bash"><code class="language-bash">npm install webgpu-instanced-lines
 </code></pre>
@@ -1487,10 +1502,10 @@ p .plot-d6a7b5 {
 }, [<span class="tok-variable">dataBindGroup</span>]);
 </code></pre>
 <p>For background on GPU line rendering, see Matt DesLauriers’ <a href="https://mattdesl.svbtle.com/drawing-lines-is-hard">Drawing Lines is Hard</a> and Rye Terrell’s <a href="https://wwwtyro.net/2019/11/18/instanced-lines.html">Instanced Line Rendering</a>.</p>
-</div></div><div id="cell-17" class="observablehq observablehq--cell"></div><div id="cell-18" class="observablehq observablehq--cell"></div><div id="cell-19" class="observablehq observablehq--cell"></div><div id="cell-20" class="observablehq observablehq--cell"></div><div id="cell-21" class="observablehq observablehq--cell"></div><div id="cell-22" class="observablehq observablehq--cell"></div><div id="cell-23" class="observablehq observablehq--cell"></div><div id="cell-24" class="observablehq observablehq--cell"></div><div id="cell-25" class="observablehq observablehq--cell"></div><div id="cell-26" class="observablehq observablehq--cell"></div><div id="cell-27" class="observablehq observablehq--cell"></div><div id="cell-28" class="observablehq observablehq--cell"></div><div id="cell-29" class="observablehq observablehq--cell"></div><div id="cell-30" class="observablehq observablehq--cell"></div><div id="cell-31" class="observablehq observablehq--cell"></div><div id="cell-32" class="observablehq observablehq--cell"></div><div id="cell-33" class="observablehq observablehq--cell"></div><div id="cell-34" class="observablehq observablehq--cell"></div><div id="cell-35" class="observablehq observablehq--cell"></div><div id="cell-36" class="observablehq observablehq--cell"></div><div id="cell-37" class="observablehq observablehq--cell"><div><hr>
+</div></div><div id="cell-19" class="observablehq observablehq--cell"></div><div id="cell-20" class="observablehq observablehq--cell"></div><div id="cell-21" class="observablehq observablehq--cell"></div><div id="cell-22" class="observablehq observablehq--cell"></div><div id="cell-23" class="observablehq observablehq--cell"></div><div id="cell-24" class="observablehq observablehq--cell"></div><div id="cell-25" class="observablehq observablehq--cell"></div><div id="cell-26" class="observablehq observablehq--cell"></div><div id="cell-27" class="observablehq observablehq--cell"></div><div id="cell-28" class="observablehq observablehq--cell"></div><div id="cell-29" class="observablehq observablehq--cell"></div><div id="cell-30" class="observablehq observablehq--cell"></div><div id="cell-31" class="observablehq observablehq--cell"></div><div id="cell-32" class="observablehq observablehq--cell"></div><div id="cell-33" class="observablehq observablehq--cell"></div><div id="cell-34" class="observablehq observablehq--cell"></div><div id="cell-35" class="observablehq observablehq--cell"></div><div id="cell-36" class="observablehq observablehq--cell"></div><div id="cell-37" class="observablehq observablehq--cell"></div><div id="cell-38" class="observablehq observablehq--cell"></div><div id="cell-39" class="observablehq observablehq--cell"></div><div id="cell-40" class="observablehq observablehq--cell"><div><hr>
 <h3 id="export-images" tabindex="-1"><a href="#export-images">Export Images</a></h3>
 <p>Download all demo images for documentation.</p>
-</div></div><div id="cell-38" class="observablehq observablehq--cell"></div></main>
+</div></div><div id="cell-41" class="observablehq observablehq--cell"></div></main>
   
 
 <style type="text/css">:root {

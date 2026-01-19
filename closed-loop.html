@@ -71,7 +71,6 @@
  *
  * Based on regl-gpu-lines, adapted for WebGPU with user-controlled vertex data.
  *
- * Key concepts:
  * - Each instance renders one line segment (from point B to point C)
  * - Uses 4-point windows: A (previous), B (start), C (end), D (next)
  * - Triangle strip covers: half of join at B, segment B→C, half of join at C
@@ -115,7 +114,7 @@ function findFunctionReturnType(code, functionName) {
  * Create a WebGPU lines renderer
  */
 function createGPULines(device, options) {
-    const { vertexShaderBody, fragmentShaderBody, colorTargets, depthStencil, multisample, primitive, vertexFunction = 'getVertex', positionField = 'position', widthField = 'width', join = 'miter', maxJoinResolution = 16, miterLimit: defaultMiterLimit = 4, cap = 'square', maxCapResolution = 16, } = options;
+    const { vertexShaderBody, fragmentShaderBody, colorTargets, depthStencil, multisample, primitive, vertexFunction = 'getVertex', positionField = 'position', widthField = 'width', join = 'miter', maxJoinResolution = 8, miterLimit: defaultMiterLimit = 4, cap = 'square', maxCapResolution = 8, clampIndices = true, } = options;
     // Normalize colorTargets to array
     const targets = Array.isArray(colorTargets) ? colorTargets : [colorTargets];
     // Warn if user overrides library-expected primitive settings, but respect their choice
@@ -175,6 +174,7 @@ function createGPULines(device, options) {
         positionField,
         widthField,
         varyings,
+        clampIndices,
     });
     const fragmentShader = createFragmentShader({
         userCode: fragmentShaderBody,
@@ -330,7 +330,7 @@ function createGPULines(device, options) {
 /**
  * Create the vertex shader
  */
-function createVertexShader({ userCode, vertexFunction, positionField, widthField, varyings, }) {
+function createVertexShader({ userCode, vertexFunction, positionField, widthField, varyings, clampIndices, }) {
     // Generate varying declarations for VertexOutput
     const varyingOutputDecls = varyings.map((v, i) => `  @location(${i + 1}) ${v.name}: ${v.type},`).join('\n');
     // Library debug varyings come after user varyings
@@ -348,7 +348,6 @@ function createVertexShader({ userCode, vertexFunction, positionField, widthFiel
 // Each instance renders one line segment from point B to point C, along with half
 // of the join at each end. The geometry is generated as a triangle strip.
 //
-// Key concepts:
 // - 4-point window: A (previous), B (start), C (end), D (next)
 // - Each instance covers: half of join at B + segment B→C + half of join at C
 // - The triangle strip is divided into two halves that "mirror" each other
@@ -359,9 +358,6 @@ function createVertexShader({ userCode, vertexFunction, positionField, widthFiel
 // and "inner" points (at the center of the join fan). For joins, vertices are
 // arranged as a fan that smoothly transitions between incoming and outgoing
 // segment directions.
-//
-// For further details, see: https://wwwtyro.net/2019/11/18/instanced-lines.html
-// and the GPU lines library documentation.
 //
 //------------------------------------------------------------------------------
 
@@ -442,11 +438,15 @@ fn vertexMain(
   // Fetch vertex data for all four points in the window
   //----------------------------------------------------------------------------
   // Call user's vertex function for each point in the window.
-  // Clamp out-of-bounds indices so we can still read valid data (we'll mark them invalid below).
+${clampIndices ? `  // Clamp out-of-bounds indices so we can still read valid data (we'll mark them invalid below).
   let vertexA = ${vertexFunction}(u32(clamp(A_idx, 0, N - 1)));
   let vertexB = ${vertexFunction}(u32(B_idx));
   let vertexC = ${vertexFunction}(u32(C_idx));
-  let vertexD = ${vertexFunction}(u32(clamp(D_idx, 0, N - 1)));
+  let vertexD = ${vertexFunction}(u32(clamp(D_idx, 0, N - 1)));` : `  // Pass raw indices (may be negative or >= N) - user handles wrapping/validation.
+  let vertexA = ${vertexFunction}(A_idx);
+  let vertexB = ${vertexFunction}(B_idx);
+  let vertexC = ${vertexFunction}(C_idx);
+  let vertexD = ${vertexFunction}(D_idx);`}
 
   // Extract positions from user vertex data
   var pA = vertexA.${positionField};
@@ -460,8 +460,11 @@ fn vertexMain(
   // A point is invalid if it's outside the polyline bounds or if the user
   // marked it invalid (w=0 or NaN). Invalid endpoints A or D indicate line
   // ends where caps should be drawn instead of joins.
+${clampIndices ? `  // With clampIndices, out-of-bounds indices trigger automatic end caps.
   let aOutOfBounds = A_idx < 0;
-  let dOutOfBounds = D_idx >= N;
+  let dOutOfBounds = D_idx >= N;` : `  // Without clampIndices, user handles bounds - only check for invalid positions.
+  let aOutOfBounds = false;
+  let dOutOfBounds = false;`}
   var aInvalid = aOutOfBounds || invalid(pA);
   var dInvalid = dOutOfBounds || invalid(pD);
   let bInvalid = invalid(pB);
@@ -538,7 +541,7 @@ fn vertexMain(
   //----------------------------------------------------------------------------
   // Mirror swap: reverse perspective for second half of triangle strip
   //----------------------------------------------------------------------------
-  // The key insight: we can reuse the same geometry computation for both halves
+  // We reuse the same geometry computation for both halves
   // of the triangle strip by swapping the point labels. When mirrored:
   //   - B becomes C, C becomes B (swap segment endpoints)
   //   - A becomes D, D becomes A (swap the neighboring points)
@@ -862,7 +865,7 @@ function createFragmentShader({ userCode, varyings }) {
 // The fragment shader receives interpolated line coordinates and user varyings,
 // then calls the user-provided getColor() function to compute the final color.
 //
-// Key inputs:
+// Inputs:
 //   lineCoord.x: for caps, position along the cap (-1 to 1); for joins/segments, 0
 //   lineCoord.y: signed distance from line center (-1 to 1, edges at ±1)
 //
@@ -911,6 +914,9 @@ export { createGPULines };
 
 // Example code
 // Closed loop example: Seven-sided star shape
+//
+// For closed loops, use modular arithmetic in getVertex to wrap indices.
+// Pass vertexCount = n + 3 to provide extra indices for proper join computation.
 export async function init(canvas) {
     const adapter = await navigator.gpu?.requestAdapter();
     if (!adapter)
@@ -919,11 +925,10 @@ export async function init(canvas) {
     const context = canvas.getContext('webgpu');
     const format = navigator.gpu.getPreferredCanvasFormat();
     context.configure({ device, format, alphaMode: 'premultiplied' });
-    // A seven-sided star, with first three vertices repeated at end for closed loop
+    // A seven-sided star - only store n unique points
     const n = 7;
-    const pointCount = n + 3;
-    const positions = new Float32Array(pointCount * 4);
-    for (let i = 0; i < pointCount; i++) {
+    const positions = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
         const t = i / n;
         const theta = t * Math.PI * 2 * 2;
         const r = 0.7;
@@ -946,17 +951,21 @@ export async function init(canvas) {
             }
         },
         join: 'round',
-        // No cap needed for closed loop
+        cap: 'butt', // No caps needed for closed loop
+        clampIndices: false, // Pass raw indices for custom wrapping
         vertexShaderBody: /* wgsl */ `
       @group(1) @binding(0) var<storage, read> positions: array<vec4f>;
+
+      const n = ${n};
 
       struct Vertex {
         position: vec4f,
         width: f32,
       }
 
-      fn getVertex(index: u32) -> Vertex {
-        let p = positions[index];
+      fn getVertex(index: i32) -> Vertex {
+        // Use modular arithmetic to wrap indices for closed loop
+        let p = positions[(index % n + n) % n];
         // Apply aspect ratio correction
         let aspect = uniforms.resolution.x / uniforms.resolution.y;
         return Vertex(vec4f(p.x, p.y * aspect, p.z, p.w), 50.0 * ${devicePixelRatio.toFixed(1)});
@@ -982,8 +991,9 @@ export async function init(canvas) {
                     storeOp: 'store'
                 }]
         });
+        // Pass n + 3 to provide extra indices for join computation at the loop closure
         drawLines.draw(pass, {
-            vertexCount: pointCount,
+            vertexCount: n + 1,
             resolution: [canvas.width, canvas.height]
         }, [dataBindGroup]);
         pass.end();
@@ -1013,7 +1023,7 @@ init(canvas).catch(err => {
 
 // Syntax highlighting
 const codeEl = document.getElementById('code');
-codeEl.textContent = "// Closed loop example: Seven-sided star shape\nexport async function init(canvas) {\n    const adapter = await navigator.gpu?.requestAdapter();\n    if (!adapter)\n        throw new Error('WebGPU not supported');\n    const device = await adapter.requestDevice();\n    const context = canvas.getContext('webgpu');\n    const format = navigator.gpu.getPreferredCanvasFormat();\n    context.configure({ device, format, alphaMode: 'premultiplied' });\n    // A seven-sided star, with first three vertices repeated at end for closed loop\n    const n = 7;\n    const pointCount = n + 3;\n    const positions = new Float32Array(pointCount * 4);\n    for (let i = 0; i < pointCount; i++) {\n        const t = i / n;\n        const theta = t * Math.PI * 2 * 2;\n        const r = 0.7;\n        positions[i * 4 + 0] = r * Math.cos(theta);\n        positions[i * 4 + 1] = r * Math.sin(theta);\n        positions[i * 4 + 2] = 0;\n        positions[i * 4 + 3] = 1;\n    }\n    const positionBuffer = device.createBuffer({\n        size: positions.byteLength,\n        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n    });\n    device.queue.writeBuffer(positionBuffer, 0, positions);\n    const drawLines = createGPULines(device, {\n        colorTargets: {\n            format,\n            blend: {\n                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },\n                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }\n            }\n        },\n        join: 'round',\n        // No cap needed for closed loop\n        vertexShaderBody: /* wgsl */ `\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n      }\n\n      fn getVertex(index: u32) -> Vertex {\n        let p = positions[index];\n        // Apply aspect ratio correction\n        let aspect = uniforms.resolution.x / uniforms.resolution.y;\n        return Vertex(vec4f(p.x, p.y * aspect, p.z, p.w), 50.0 * ${devicePixelRatio.toFixed(1)});\n      }\n    `,\n        fragmentShaderBody: /* wgsl */ `\n      fn getColor(lineCoord: vec2f) -> vec4f {\n        return vec4f(1.0, 1.0, 1.0, 0.5);\n      }\n    `,\n    });\n    const dataBindGroup = device.createBindGroup({\n        layout: drawLines.getBindGroupLayout(1),\n        entries: [{ binding: 0, resource: { buffer: positionBuffer } }]\n    });\n    function render() {\n        const encoder = device.createCommandEncoder();\n        const pass = encoder.beginRenderPass({\n            colorAttachments: [{\n                    view: context.getCurrentTexture().createView(),\n                    clearValue: [0.2, 0.2, 0.2, 1],\n                    loadOp: 'clear',\n                    storeOp: 'store'\n                }]\n        });\n        drawLines.draw(pass, {\n            vertexCount: pointCount,\n            resolution: [canvas.width, canvas.height]\n        }, [dataBindGroup]);\n        pass.end();\n        device.queue.submit([encoder.finish()]);\n    }\n    render();\n    window.addEventListener('resize', render);\n    return { render, destroy: () => drawLines.destroy() };\n}";
+codeEl.textContent = "// Closed loop example: Seven-sided star shape\n//\n// For closed loops, use modular arithmetic in getVertex to wrap indices.\n// Pass vertexCount = n + 3 to provide extra indices for proper join computation.\nexport async function init(canvas) {\n    const adapter = await navigator.gpu?.requestAdapter();\n    if (!adapter)\n        throw new Error('WebGPU not supported');\n    const device = await adapter.requestDevice();\n    const context = canvas.getContext('webgpu');\n    const format = navigator.gpu.getPreferredCanvasFormat();\n    context.configure({ device, format, alphaMode: 'premultiplied' });\n    // A seven-sided star - only store n unique points\n    const n = 7;\n    const positions = new Float32Array(n * 4);\n    for (let i = 0; i < n; i++) {\n        const t = i / n;\n        const theta = t * Math.PI * 2 * 2;\n        const r = 0.7;\n        positions[i * 4 + 0] = r * Math.cos(theta);\n        positions[i * 4 + 1] = r * Math.sin(theta);\n        positions[i * 4 + 2] = 0;\n        positions[i * 4 + 3] = 1;\n    }\n    const positionBuffer = device.createBuffer({\n        size: positions.byteLength,\n        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n    });\n    device.queue.writeBuffer(positionBuffer, 0, positions);\n    const drawLines = createGPULines(device, {\n        colorTargets: {\n            format,\n            blend: {\n                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },\n                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }\n            }\n        },\n        join: 'round',\n        cap: 'butt', // No caps needed for closed loop\n        clampIndices: false, // Pass raw indices for custom wrapping\n        vertexShaderBody: /* wgsl */ `\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n\n      const n = ${n};\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n      }\n\n      fn getVertex(index: i32) -> Vertex {\n        // Use modular arithmetic to wrap indices for closed loop\n        let p = positions[(index % n + n) % n];\n        // Apply aspect ratio correction\n        let aspect = uniforms.resolution.x / uniforms.resolution.y;\n        return Vertex(vec4f(p.x, p.y * aspect, p.z, p.w), 50.0 * ${devicePixelRatio.toFixed(1)});\n      }\n    `,\n        fragmentShaderBody: /* wgsl */ `\n      fn getColor(lineCoord: vec2f) -> vec4f {\n        return vec4f(1.0, 1.0, 1.0, 0.5);\n      }\n    `,\n    });\n    const dataBindGroup = device.createBindGroup({\n        layout: drawLines.getBindGroupLayout(1),\n        entries: [{ binding: 0, resource: { buffer: positionBuffer } }]\n    });\n    function render() {\n        const encoder = device.createCommandEncoder();\n        const pass = encoder.beginRenderPass({\n            colorAttachments: [{\n                    view: context.getCurrentTexture().createView(),\n                    clearValue: [0.2, 0.2, 0.2, 1],\n                    loadOp: 'clear',\n                    storeOp: 'store'\n                }]\n        });\n        // Pass n + 3 to provide extra indices for join computation at the loop closure\n        drawLines.draw(pass, {\n            vertexCount: n + 1,\n            resolution: [canvas.width, canvas.height]\n        }, [dataBindGroup]);\n        pass.end();\n        device.queue.submit([encoder.finish()]);\n    }\n    render();\n    window.addEventListener('resize', render);\n    return { render, destroy: () => drawLines.destroy() };\n}";
 hljs.highlightElement(codeEl);
 </script>
 </body>

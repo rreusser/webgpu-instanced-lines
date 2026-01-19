@@ -28,13 +28,14 @@ interface GPULinesOptions {
   miterLimit?: number;         // Miter limit before bevel fallback (default: 4)
   joinResolution?: number;     // Default triangles for round joins (default: 8)
   capResolution?: number;      // Default triangles for round caps (default: 8)
-  maxJoinResolution?: number;  // Max join resolution at runtime (default: 16)
-  maxCapResolution?: number;   // Max cap resolution at runtime (default: 16)
+  maxJoinResolution?: number;  // Max join resolution at runtime (default: 8)
+  maxCapResolution?: number;   // Max cap resolution at runtime (default: 8)
 
   // Shader customization
   vertexFunction?: string;     // Name of vertex function (default: 'getVertex')
   positionField?: string;      // Name of position field (default: 'position')
   widthField?: string;         // Name of width field (default: 'width')
+  clampIndices?: boolean;      // Clamp indices to [0, N-1] (default: true)
 }
 \`\`\`
 
@@ -68,17 +69,33 @@ interface DrawProps {
 
 Controls how line segments are connected at vertices. Options are \`'bevel'\`, \`'miter'\`, and \`'round'\`.
 
+| \`join: 'bevel'\` | \`join: 'miter'\` | \`join: 'round'\` |
+|:---:|:---:|:---:|
+| <img src="images/join-bevel.png" width="200"> | <img src="images/join-miter.png" width="200"> | <img src="images/join-round.png" width="200"> |
+
 ### \`cap\`
 
 Controls how line endpoints are rendered. Options are \`'round'\`, \`'square'\`, and \`'butt'\`.
+
+| \`cap: 'round'\` | \`cap: 'square'\` | \`cap: 'butt'\` |
+|:---:|:---:|:---:|
+| <img src="images/cap-round.png" width="200"> | <img src="images/cap-square.png" width="200"> | <img src="images/cap-butt.png" width="200"> |
 
 ### \`miterLimit\`
 
 When using \`join: 'miter'\`, this controls when sharp angles fall back to bevel joins. Lower values create more bevels. Higher values allow longer miter points. Default is \`4\`.
 
+| \`miterLimit: 1\` | \`miterLimit: 4\` | \`miterLimit: 10\` |
+|:---:|:---:|:---:|
+| <img src="images/miter-1.png" width="200"> | <img src="images/miter-4.png" width="200"> | <img src="images/miter-10.png" width="200"> |
+
 ### \`joinResolution\` and \`capResolution\`
 
 Control the number of triangles used for round joins and caps. Higher values create smoother curves. Default is \`8\`. Use \`maxJoinResolution\` and \`maxCapResolution\` to set upper bounds for runtime adjustment.
+
+| \`joinResolution: 2\` | \`joinResolution: 4\` | \`joinResolution: 16\` |
+|:---:|:---:|:---:|
+| <img src="images/res-2.png" width="200"> | <img src="images/res-4.png" width="200"> | <img src="images/res-16.png" width="200"> |
 
 ### Performance: Vertices Per Instance
 
@@ -102,13 +119,60 @@ Where:
 | round | square | 2 × (maxJoinResolution × 2 + 3) |
 | round | round | 2 × (max(maxJoinResolution, maxCapResolution) × 2 + 3) |
 
-With the default \`maxJoinResolution = 16\` and \`maxCapResolution = 16\`, round geometry uses 70 vertices per instance.
+With the default \`maxJoinResolution = 8\` and \`maxCapResolution = 8\`, round geometry uses 38 vertices per instance.
 
-**Key takeaway:** If you don't need round joins or caps, you can set \`maxJoinResolution\` and \`maxCapResolution\` to any value without affecting performance. Only round geometry uses the resolution settings to determine vertex count.
+If you don't need round joins or caps, you can set \`maxJoinResolution\` and \`maxCapResolution\` to any value without affecting performance. Only round geometry uses the resolution settings to determine vertex count.
 
 ### Line Breaks
 
 Insert a point with \`w = 0\` (or \`NaN\` for any coordinate) to create a line break. This splits the line into separate segments, each with its own end caps.
+
+| Continuous line | With line break (\`w: 0\`) |
+|:---:|:---:|
+| <img src="images/continuous.png" width="200"> | <img src="images/with-break.png" width="200"> |
+
+### Closed Loops
+
+To draw a closed loop where the last point connects back to the first, set \`clampIndices: false\` and use modular arithmetic in your \`getVertex\` function. This passes raw indices (including -1 and values ≥ N) to your function as \`i32\`, allowing custom wrapping logic.
+
+\`\`\`javascript
+const gpuLines = createGPULines(device, {
+  // ...
+  clampIndices: false,  // Pass raw indices for custom wrapping
+  cap: 'butt',          // No caps needed for closed loop
+  vertexShaderBody: /* wgsl */\`
+    @group(1) @binding(0) var<storage, read> positions: array<vec4f>;
+    const n = 7;  // Number of unique points
+
+    struct Vertex { position: vec4f, width: f32 }
+
+    fn getVertex(index: i32) -> Vertex {  // Note: i32, not u32
+      let p = positions[(index % n + n) % n];  // Wrap indices
+      return Vertex(vec4f(p.xyz, p.w), 20.0);
+    }
+  \`,
+  // ...
+});
+\`\`\`
+
+\`\`\`javascript
+// Draw call: pass n + 1 for vertexCount (n segments for n points)
+gpuLines.draw(pass, {
+  vertexCount: n + 1,
+  resolution: [canvas.width, canvas.height]
+}, [dataBindGroup]);
+\`\`\`
+
+### \`clampIndices\`
+
+Controls how indices are passed to your \`getVertex\` function:
+
+| \`clampIndices\` | Index type | Behavior |
+|----------------|------------|----------|
+| \`true\` (default) | \`u32\` | Indices clamped to [0, N-1]. Out-of-bounds triggers automatic end caps. |
+| \`false\` | \`i32\` | Raw indices passed (-1, N, etc.). User handles wrapping. No automatic caps from bounds. |
+
+When \`clampIndices: false\`, you can still trigger caps by returning an invalid position (\`w = 0\` or \`NaN\`) from \`getVertex\`.
 
 ## Drawing
 
@@ -217,6 +281,10 @@ The \`lineCoord\` values are designed for SDF (signed distance field) rendering.
 
 Note that \`lineCoord.x\` does NOT provide distance along the line. To implement dashes, add a cumulative distance field to your \`Vertex\` struct. It will be interpolated and passed to \`getColor\` as an extra parameter. See the interactive demo's "Stripes" option for an example.
 
+| \`lineCoord.x\` (0 on segments, varies in caps) | \`lineCoord.y\` (across line) |
+|:---:|:---:|
+| <img src="images/lc-x.png" width="200"> | <img src="images/lc-y.png" width="200"> |
+
 ### Example Shaders
 
 Solid color with edge darkening.
@@ -255,17 +323,7 @@ fn getColor(lineCoord: vec2f) -> vec4f {
 }
 \`\`\`
 
-When using transparency or \`discard\`, enable alpha blending.
-\`\`\`javascript
-createGPULines(device, {
-  colorTargets: {
-    format: canvasFormat,
-    blend: {
-      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
-    }
-  }
-});
-\`\`\`
-
+| Cross-line stripes | Cross-line gradient | SDF stroke |
+|:---:|:---:|:---:|
+| <img src="images/stripes.png" width="200"> | <img src="images/gradient.png" width="200"> | <img src="images/sdf-stroke.png" width="200"> |
 `;export{e as default};

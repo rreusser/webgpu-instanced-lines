@@ -1,6 +1,6 @@
-function ne(n,i){const r=i?new RegExp(`struct\\s+${i}\\s*\\{([^}]+)\\}`,"s"):/struct\s+(\w+)\s*\{([^}]+)\}/s,s=n.match(r);if(!s)return[];const a=i?s[1]:s[2],c=[],f=/(\w+)\s*:\s*([\w<>]+)\s*,?/g;let t;for(;(t=f.exec(a))!==null;)c.push({name:t[1].trim(),type:t[2].trim()});return c}function oe(n,i){const r=new RegExp(`fn\\s+${i}\\s*\\([^)]*\\)\\s*->\\s*(\\w+)`,"s"),s=n.match(r);return s?s[1]:null}function de(n,i){const{vertexShaderBody:r,fragmentShaderBody:s,colorTargets:a,depthStencil:c,multisample:f,primitive:t,vertexFunction:l="getVertex",positionField:o="position",widthField:v="width",join:P="miter",maxJoinResolution:x=16,miterLimit:J=4,cap:C="square",maxCapResolution:y=16}=i,X=Array.isArray(a)?a:[a];t?.topology!==void 0&&t.topology!=="triangle-strip"&&console.warn(`gpu-lines: primitive.topology is "${t.topology}". This library is designed for 'triangle-strip' and may not render correctly.`),t?.stripIndexFormat!==void 0&&console.warn("gpu-lines: primitive.stripIndexFormat is set but this library does not use indexed drawing.");const w=oe(r,l);if(!w)throw new Error(`Could not find vertex function '${l}' in vertexShaderBody`);const b=ne(r,w);if(b.length===0)throw new Error(`Could not parse struct '${w}' in vertexShaderBody`);const U=b.findIndex(e=>e.name===o);if(U===-1)throw new Error(`Position field '${o}' not found in struct '${w}'`);const O=b.findIndex(e=>e.name===v);if(O===-1)throw new Error(`Width field '${v}' not found in struct '${w}'. The vertex struct must include a width field.`);const W=b.filter((e,p)=>p!==U&&p!==O),S=P==="round",k=P==="bevel",j=k?0:J,H=C!=="butt";let D;C==="butt"?D=1:C==="square"?D=3:D=y;const A=S?x*2:2,I=D*2,N=C==="square"?[2,2/Math.sqrt(3)]:[1,1],K=(Math.max(I,A)+3)*2,Q=re({userCode:r,vertexFunction:l,positionField:o,widthField:v,varyings:W}),Z=se({userCode:s,varyings:W}),ee=n.createShaderModule({label:"gpu-lines-vertex",code:Q}),te=n.createShaderModule({label:"gpu-lines-fragment",code:Z}),$={label:"gpu-lines",layout:"auto",vertex:{module:ee,entryPoint:"vertexMain"},fragment:{module:te,entryPoint:"fragmentMain",targets:X},primitive:{topology:t?.topology??"triangle-strip",stripIndexFormat:t?.stripIndexFormat,cullMode:t?.cullMode??"none",frontFace:t?.frontFace??"ccw",unclippedDepth:t?.unclippedDepth??!1}};c&&($.depthStencil=c),f&&($.multisample=f);const R=n.createRenderPipeline($),T=n.createBuffer({label:"gpu-lines-uniforms",size:40,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),ie=n.createBindGroup({layout:R.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:T}}]}),F=new ArrayBuffer(40),d=new Float32Array(F),L=new Uint32Array(F);d[2]=I,d[3]=A,d[4]=j*j,L[5]=S?1:0,L[7]=H?1:0,d[8]=N[0],d[9]=N[1];let E=-1,z=-1,q=-1,G=I,V=A,M=j*j,Y=!1;return{getBindGroupLayout(e){return R.getBindGroupLayout(e)},updateUniforms(e){const{vertexCount:p,resolution:u}=e;let h=I;if(C==="round"&&e.capResolution!==void 0){const _=Math.min(e.capResolution,y);e.capResolution>y&&console.warn(`capResolution ${e.capResolution} exceeds maxCapResolution ${y}, clamping to ${y}`),h=_*2}let g=A;if(S&&e.joinResolution!==void 0){const _=Math.min(e.joinResolution,x);e.joinResolution>x&&console.warn(`joinResolution ${e.joinResolution} exceeds maxJoinResolution ${x}, clamping to ${x}`),g=_*2}let m=M;!k&&e.miterLimit!==void 0&&(m=e.miterLimit*e.miterLimit),(!Y||p!==E||u[0]!==z||u[1]!==q||h!==G||g!==V||m!==M)&&(d[0]=u[0],d[1]=u[1],d[2]=h,d[3]=g,d[4]=m,L[6]=p,n.queue.writeBuffer(T,0,F),E=p,z=u[0],q=u[1],G=h,V=g,M=m,Y=!0)},draw(e,p,u=[]){const{vertexCount:h,skipUniformUpdate:g}=p;g||this.updateUniforms(p);const m=Math.max(0,h-1);if(m>0){e.setPipeline(R),e.setBindGroup(0,ie);for(let B=0;B<u.length;B++)e.setBindGroup(B+1,u[B]);e.draw(K,m)}},destroy(){T.destroy()}}}function re({userCode:n,vertexFunction:i,positionField:r,widthField:s,varyings:a}){const c=a.map((o,v)=>`  @location(${v+1}) ${o.name}: ${o.type},`).join(`
-`),f=a.length+1,t=a.map(o=>`  let ${o.name} = mix(vertexB.${o.name}, vertexC.${o.name}, clamp(useC, 0.0, 1.0));`).join(`
-`),l=a.map(o=>`  output.${o.name} = ${o.name};`).join(`
+function oe(n,t){const o=t?new RegExp(`struct\\s+${t}\\s*\\{([^}]+)\\}`,"s"):/struct\s+(\w+)\s*\{([^}]+)\}/s,r=n.match(o);if(!r)return[];const s=t?r[1]:r[2],l=[],f=/(\w+)\s*:\s*([\w<>]+)\s*,?/g;let i;for(;(i=f.exec(s))!==null;)l.push({name:i[1].trim(),type:i[2].trim()});return l}function re(n,t){const o=new RegExp(`fn\\s+${t}\\s*\\([^)]*\\)\\s*->\\s*(\\w+)`,"s"),r=n.match(o);return r?r[1]:null}function ce(n,t){const{vertexShaderBody:o,fragmentShaderBody:r,colorTargets:s,depthStencil:l,multisample:f,primitive:i,vertexFunction:d="getVertex",positionField:m="position",widthField:a="width",join:b="miter",maxJoinResolution:x=8,miterLimit:J=4,cap:C="square",maxCapResolution:y=8,clampIndices:X=!0}=t,H=Array.isArray(s)?s:[s];i?.topology!==void 0&&i.topology!=="triangle-strip"&&console.warn(`gpu-lines: primitive.topology is "${i.topology}". This library is designed for 'triangle-strip' and may not render correctly.`),i?.stripIndexFormat!==void 0&&console.warn("gpu-lines: primitive.stripIndexFormat is set but this library does not use indexed drawing.");const B=re(o,d);if(!B)throw new Error(`Could not find vertex function '${d}' in vertexShaderBody`);const D=oe(o,B);if(D.length===0)throw new Error(`Could not parse struct '${B}' in vertexShaderBody`);const P=D.findIndex(e=>e.name===m);if(P===-1)throw new Error(`Position field '${m}' not found in struct '${B}'`);const U=D.findIndex(e=>e.name===a);if(U===-1)throw new Error(`Width field '${a}' not found in struct '${B}'. The vertex struct must include a width field.`);const W=D.filter((e,p)=>p!==P&&p!==U),$=b==="round",N=b==="bevel",A=N?0:J,K=C!=="butt";let j;C==="butt"?j=1:C==="square"?j=3:j=y;const I=$?x*2:2,S=j*2,k=C==="square"?[2,2/Math.sqrt(3)]:[1,1],Q=(Math.max(S,I)+3)*2,Z=se({userCode:o,vertexFunction:d,positionField:m,widthField:a,varyings:W,clampIndices:X}),ee=ae({userCode:r,varyings:W}),te=n.createShaderModule({label:"gpu-lines-vertex",code:Z}),ie=n.createShaderModule({label:"gpu-lines-fragment",code:ee}),R={label:"gpu-lines",layout:"auto",vertex:{module:te,entryPoint:"vertexMain"},fragment:{module:ie,entryPoint:"fragmentMain",targets:H},primitive:{topology:i?.topology??"triangle-strip",stripIndexFormat:i?.stripIndexFormat,cullMode:i?.cullMode??"none",frontFace:i?.frontFace??"ccw",unclippedDepth:i?.unclippedDepth??!1}};l&&(R.depthStencil=l),f&&(R.multisample=f);const T=n.createRenderPipeline(R),_=n.createBuffer({label:"gpu-lines-uniforms",size:40,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),ne=n.createBindGroup({layout:T.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:_}}]}),F=new ArrayBuffer(40),c=new Float32Array(F),L=new Uint32Array(F);c[2]=S,c[3]=I,c[4]=A*A,L[5]=$?1:0,L[7]=K?1:0,c[8]=k[0],c[9]=k[1];let E=-1,z=-1,q=-1,V=S,G=I,M=A*A,Y=!1;return{getBindGroupLayout(e){return T.getBindGroupLayout(e)},updateUniforms(e){const{vertexCount:p,resolution:u}=e;let g=S;if(C==="round"&&e.capResolution!==void 0){const O=Math.min(e.capResolution,y);e.capResolution>y&&console.warn(`capResolution ${e.capResolution} exceeds maxCapResolution ${y}, clamping to ${y}`),g=O*2}let v=I;if($&&e.joinResolution!==void 0){const O=Math.min(e.joinResolution,x);e.joinResolution>x&&console.warn(`joinResolution ${e.joinResolution} exceeds maxJoinResolution ${x}, clamping to ${x}`),v=O*2}let h=M;!N&&e.miterLimit!==void 0&&(h=e.miterLimit*e.miterLimit),(!Y||p!==E||u[0]!==z||u[1]!==q||g!==V||v!==G||h!==M)&&(c[0]=u[0],c[1]=u[1],c[2]=g,c[3]=v,c[4]=h,L[6]=p,n.queue.writeBuffer(_,0,F),E=p,z=u[0],q=u[1],V=g,G=v,M=h,Y=!0)},draw(e,p,u=[]){const{vertexCount:g,skipUniformUpdate:v}=p;v||this.updateUniforms(p);const h=Math.max(0,g-1);if(h>0){e.setPipeline(T),e.setBindGroup(0,ne);for(let w=0;w<u.length;w++)e.setBindGroup(w+1,u[w]);e.draw(Q,h)}},destroy(){_.destroy()}}}function se({userCode:n,vertexFunction:t,positionField:o,widthField:r,varyings:s,clampIndices:l}){const f=s.map((a,b)=>`  @location(${b+1}) ${a.name}: ${a.type},`).join(`
+`),i=s.length+1,d=s.map(a=>`  let ${a.name} = mix(vertexB.${a.name}, vertexC.${a.name}, clamp(useC, 0.0, 1.0));`).join(`
+`),m=s.map(a=>`  output.${a.name} = ${a.name};`).join(`
 `);return`
 //------------------------------------------------------------------------------
 // GPU Lines Vertex Shader
@@ -10,7 +10,6 @@ function ne(n,i){const r=i?new RegExp(`struct\\s+${i}\\s*\\{([^}]+)\\}`,"s"):/st
 // Each instance renders one line segment from point B to point C, along with half
 // of the join at each end. The geometry is generated as a triangle strip.
 //
-// Key concepts:
 // - 4-point window: A (previous), B (start), C (end), D (next)
 // - Each instance covers: half of join at B + segment B→C + half of join at C
 // - The triangle strip is divided into two halves that "mirror" each other
@@ -21,9 +20,6 @@ function ne(n,i){const r=i?new RegExp(`struct\\s+${i}\\s*\\{([^}]+)\\}`,"s"):/st
 // and "inner" points (at the center of the join fan). For joins, vertices are
 // arranged as a fan that smoothly transitions between incoming and outgoing
 // segment directions.
-//
-// For further details, see: https://wwwtyro.net/2019/11/18/instanced-lines.html
-// and the GPU lines library documentation.
 //
 //------------------------------------------------------------------------------
 
@@ -57,12 +53,12 @@ struct VertexOutput {
   //   y: signed distance from line center (-1 at edge, 0 at center, 1 at opposite edge)
   // Note: The sign of y indicates which side of the line the vertex is on
   @location(0) lineCoord: vec2f,
-${c}
+${f}
   // Debug varyings for visualization and debugging:
   // instanceID: Segment index (negative for cap vertices to distinguish them)
-  @location(${f}) instanceID: f32,
+  @location(${i}) instanceID: f32,
   // triStripCoord: Position within triangle strip (x: pair index, y: top=1/bottom=0)
-  @location(${f+1}) triStripCoord: vec2f,
+  @location(${i+1}) triStripCoord: vec2f,
 }
 
 // User-provided code (bindings, structs, vertex function)
@@ -104,17 +100,21 @@ fn vertexMain(
   // Fetch vertex data for all four points in the window
   //----------------------------------------------------------------------------
   // Call user's vertex function for each point in the window.
-  // Clamp out-of-bounds indices so we can still read valid data (we'll mark them invalid below).
-  let vertexA = ${i}(u32(clamp(A_idx, 0, N - 1)));
-  let vertexB = ${i}(u32(B_idx));
-  let vertexC = ${i}(u32(C_idx));
-  let vertexD = ${i}(u32(clamp(D_idx, 0, N - 1)));
+${l?`  // Clamp out-of-bounds indices so we can still read valid data (we'll mark them invalid below).
+  let vertexA = ${t}(u32(clamp(A_idx, 0, N - 1)));
+  let vertexB = ${t}(u32(B_idx));
+  let vertexC = ${t}(u32(C_idx));
+  let vertexD = ${t}(u32(clamp(D_idx, 0, N - 1)));`:`  // Pass raw indices (may be negative or >= N) - user handles wrapping/validation.
+  let vertexA = ${t}(A_idx);
+  let vertexB = ${t}(B_idx);
+  let vertexC = ${t}(C_idx);
+  let vertexD = ${t}(D_idx);`}
 
   // Extract positions from user vertex data
-  var pA = vertexA.${r};
-  var pB = vertexB.${r};
-  var pC = vertexC.${r};
-  var pD = vertexD.${r};
+  var pA = vertexA.${o};
+  var pB = vertexB.${o};
+  var pC = vertexC.${o};
+  var pD = vertexD.${o};
 
   //----------------------------------------------------------------------------
   // Determine which points are invalid (out of bounds or explicitly marked)
@@ -122,8 +122,11 @@ fn vertexMain(
   // A point is invalid if it's outside the polyline bounds or if the user
   // marked it invalid (w=0 or NaN). Invalid endpoints A or D indicate line
   // ends where caps should be drawn instead of joins.
+${l?`  // With clampIndices, out-of-bounds indices trigger automatic end caps.
   let aOutOfBounds = A_idx < 0;
-  let dOutOfBounds = D_idx >= N;
+  let dOutOfBounds = D_idx >= N;`:`  // Without clampIndices, user handles bounds - only check for invalid positions.
+  let aOutOfBounds = false;
+  let dOutOfBounds = false;`}
   var aInvalid = aOutOfBounds || invalid(pA);
   var dInvalid = dOutOfBounds || invalid(pD);
   let bInvalid = invalid(pB);
@@ -200,7 +203,7 @@ fn vertexMain(
   //----------------------------------------------------------------------------
   // Mirror swap: reverse perspective for second half of triangle strip
   //----------------------------------------------------------------------------
-  // The key insight: we can reuse the same geometry computation for both halves
+  // We reuse the same geometry computation for both halves
   // of the triangle strip by swapping the point labels. When mirrored:
   //   - B becomes C, C becomes B (swap segment endpoints)
   //   - A becomes D, D becomes A (swap the neighboring points)
@@ -345,7 +348,7 @@ fn vertexMain(
   lineCoord.y = dirB * mirrorSign;
 
   // Get line width from the appropriate vertex (B for first half, C for mirrored half)
-  let width = select(vertexB.${s}, vertexC.${s}, mirror);
+  let width = select(vertexB.${r}, vertexC.${r}, mirror);
   let roundOrCap = uniforms.isRound == 1u || isCap;
 
   //----------------------------------------------------------------------------
@@ -477,14 +480,14 @@ fn vertexMain(
   let useC = select(0.0, 1.0, mirror) + dx * (width / lBC);
 
   // Interpolate user varyings
-${t}
+${d}
 
   //----------------------------------------------------------------------------
   // Populate output structure
   //----------------------------------------------------------------------------
   output.position = pos;
   output.lineCoord = lineCoord;
-${l}
+${m}
 
   // Debug varyings for visualization and wireframe rendering
   // instanceID: segment index, or negative (-index - 1) for cap vertices
@@ -500,8 +503,8 @@ ${l}
 
   return output;
 }
-`}function se({userCode:n,varyings:i}){const r=i.map((l,o)=>`  @location(${o+1}) ${l.name}: ${l.type},`).join(`
-`),s=i.length+1,a=i.map(l=>`input.${l.name}`).join(", "),c=a?`, ${a}`:"",t=/\binstanceID\b/.test(n)?", input.instanceID, input.triStripCoord":"";return`
+`}function ae({userCode:n,varyings:t}){const o=t.map((d,m)=>`  @location(${m+1}) ${d.name}: ${d.type},`).join(`
+`),r=t.length+1,s=t.map(d=>`input.${d.name}`).join(", "),l=s?`, ${s}`:"",i=/\binstanceID\b/.test(n)?", input.instanceID, input.triStripCoord":"";return`
 //------------------------------------------------------------------------------
 // GPU Lines Fragment Shader
 //------------------------------------------------------------------------------
@@ -509,7 +512,7 @@ ${l}
 // The fragment shader receives interpolated line coordinates and user varyings,
 // then calls the user-provided getColor() function to compute the final color.
 //
-// Key inputs:
+// Inputs:
 //   lineCoord.x: for caps, position along the cap (-1 to 1); for joins/segments, 0
 //   lineCoord.y: signed distance from line center (-1 to 1, edges at ±1)
 //
@@ -536,17 +539,17 @@ struct Uniforms {
 struct FragmentInput {
   // Line coordinate for SDF-based effects
   @location(0) lineCoord: vec2f,
-${r}
+${o}
   // Debug: segment index (negative for caps)
-  @location(${s}) instanceID: f32,
+  @location(${r}) instanceID: f32,
   // Debug: position in triangle strip (for wireframe)
-  @location(${s+1}) triStripCoord: vec2f,
+  @location(${r+1}) triStripCoord: vec2f,
 }
 
 ${n}
 
 @fragment
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
-  return getColor(input.lineCoord${c}${t});
+  return getColor(input.lineCoord${l}${i});
 }
-`}export{de as createGPULines};
+`}export{ce as createGPULines};

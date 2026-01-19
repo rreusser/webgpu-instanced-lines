@@ -71,7 +71,6 @@
  *
  * Based on regl-gpu-lines, adapted for WebGPU with user-controlled vertex data.
  *
- * Key concepts:
  * - Each instance renders one line segment (from point B to point C)
  * - Uses 4-point windows: A (previous), B (start), C (end), D (next)
  * - Triangle strip covers: half of join at B, segment B→C, half of join at C
@@ -115,7 +114,7 @@ function findFunctionReturnType(code, functionName) {
  * Create a WebGPU lines renderer
  */
 function createGPULines(device, options) {
-    const { vertexShaderBody, fragmentShaderBody, colorTargets, depthStencil, multisample, primitive, vertexFunction = 'getVertex', positionField = 'position', widthField = 'width', join = 'miter', maxJoinResolution = 16, miterLimit: defaultMiterLimit = 4, cap = 'square', maxCapResolution = 16, } = options;
+    const { vertexShaderBody, fragmentShaderBody, colorTargets, depthStencil, multisample, primitive, vertexFunction = 'getVertex', positionField = 'position', widthField = 'width', join = 'miter', maxJoinResolution = 8, miterLimit: defaultMiterLimit = 4, cap = 'square', maxCapResolution = 8, clampIndices = true, } = options;
     // Normalize colorTargets to array
     const targets = Array.isArray(colorTargets) ? colorTargets : [colorTargets];
     // Warn if user overrides library-expected primitive settings, but respect their choice
@@ -175,6 +174,7 @@ function createGPULines(device, options) {
         positionField,
         widthField,
         varyings,
+        clampIndices,
     });
     const fragmentShader = createFragmentShader({
         userCode: fragmentShaderBody,
@@ -330,7 +330,7 @@ function createGPULines(device, options) {
 /**
  * Create the vertex shader
  */
-function createVertexShader({ userCode, vertexFunction, positionField, widthField, varyings, }) {
+function createVertexShader({ userCode, vertexFunction, positionField, widthField, varyings, clampIndices, }) {
     // Generate varying declarations for VertexOutput
     const varyingOutputDecls = varyings.map((v, i) => `  @location(${i + 1}) ${v.name}: ${v.type},`).join('\n');
     // Library debug varyings come after user varyings
@@ -348,7 +348,6 @@ function createVertexShader({ userCode, vertexFunction, positionField, widthFiel
 // Each instance renders one line segment from point B to point C, along with half
 // of the join at each end. The geometry is generated as a triangle strip.
 //
-// Key concepts:
 // - 4-point window: A (previous), B (start), C (end), D (next)
 // - Each instance covers: half of join at B + segment B→C + half of join at C
 // - The triangle strip is divided into two halves that "mirror" each other
@@ -359,9 +358,6 @@ function createVertexShader({ userCode, vertexFunction, positionField, widthFiel
 // and "inner" points (at the center of the join fan). For joins, vertices are
 // arranged as a fan that smoothly transitions between incoming and outgoing
 // segment directions.
-//
-// For further details, see: https://wwwtyro.net/2019/11/18/instanced-lines.html
-// and the GPU lines library documentation.
 //
 //------------------------------------------------------------------------------
 
@@ -442,11 +438,15 @@ fn vertexMain(
   // Fetch vertex data for all four points in the window
   //----------------------------------------------------------------------------
   // Call user's vertex function for each point in the window.
-  // Clamp out-of-bounds indices so we can still read valid data (we'll mark them invalid below).
+${clampIndices ? `  // Clamp out-of-bounds indices so we can still read valid data (we'll mark them invalid below).
   let vertexA = ${vertexFunction}(u32(clamp(A_idx, 0, N - 1)));
   let vertexB = ${vertexFunction}(u32(B_idx));
   let vertexC = ${vertexFunction}(u32(C_idx));
-  let vertexD = ${vertexFunction}(u32(clamp(D_idx, 0, N - 1)));
+  let vertexD = ${vertexFunction}(u32(clamp(D_idx, 0, N - 1)));` : `  // Pass raw indices (may be negative or >= N) - user handles wrapping/validation.
+  let vertexA = ${vertexFunction}(A_idx);
+  let vertexB = ${vertexFunction}(B_idx);
+  let vertexC = ${vertexFunction}(C_idx);
+  let vertexD = ${vertexFunction}(D_idx);`}
 
   // Extract positions from user vertex data
   var pA = vertexA.${positionField};
@@ -460,8 +460,11 @@ fn vertexMain(
   // A point is invalid if it's outside the polyline bounds or if the user
   // marked it invalid (w=0 or NaN). Invalid endpoints A or D indicate line
   // ends where caps should be drawn instead of joins.
+${clampIndices ? `  // With clampIndices, out-of-bounds indices trigger automatic end caps.
   let aOutOfBounds = A_idx < 0;
-  let dOutOfBounds = D_idx >= N;
+  let dOutOfBounds = D_idx >= N;` : `  // Without clampIndices, user handles bounds - only check for invalid positions.
+  let aOutOfBounds = false;
+  let dOutOfBounds = false;`}
   var aInvalid = aOutOfBounds || invalid(pA);
   var dInvalid = dOutOfBounds || invalid(pD);
   let bInvalid = invalid(pB);
@@ -538,7 +541,7 @@ fn vertexMain(
   //----------------------------------------------------------------------------
   // Mirror swap: reverse perspective for second half of triangle strip
   //----------------------------------------------------------------------------
-  // The key insight: we can reuse the same geometry computation for both halves
+  // We reuse the same geometry computation for both halves
   // of the triangle strip by swapping the point labels. When mirrored:
   //   - B becomes C, C becomes B (swap segment endpoints)
   //   - A becomes D, D becomes A (swap the neighboring points)
@@ -862,7 +865,7 @@ function createFragmentShader({ userCode, varyings }) {
 // The fragment shader receives interpolated line coordinates and user varyings,
 // then calls the user-provided getColor() function to compute the final color.
 //
-// Key inputs:
+// Inputs:
 //   lineCoord.x: for caps, position along the cap (-1 to 1); for joins/segments, 0
 //   lineCoord.y: signed distance from line center (-1 to 1, edges at ±1)
 //
