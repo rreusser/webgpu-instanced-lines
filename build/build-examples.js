@@ -27,11 +27,30 @@ const examples = readdirSync(examplesDistDir)
   .filter(f => f.endsWith('.js'))
   .map(f => basename(f, '.js'));
 
+// External dependencies that should be loaded via import map
+const externalDeps = {
+  'gl-matrix': 'https://esm.sh/gl-matrix@3.4.3'
+};
+
 function generateHTML(name, exampleSource) {
-  // Remove the import statement and adjust the source
+  // Remove only the internal library import, keep external imports
   const adjustedSource = exampleSource
-    .replace(/import\s*\{[^}]+\}\s*from\s*['"][^'"]+['"];\s*/g, '')
+    .replace(/import\s*\{[^}]+\}\s*from\s*['"]\.\.\/[^'"]+['"];\s*/g, '')
     .trim();
+
+  // Check which external deps are used
+  const usedDeps = Object.keys(externalDeps).filter(dep =>
+    exampleSource.includes(`from '${dep}'`) || exampleSource.includes(`from "${dep}"`)
+  );
+
+  const importMap = usedDeps.length > 0 ? `
+  <script type="importmap">
+    {
+      "imports": {
+        ${usedDeps.map(dep => `"${dep}": "${externalDeps[dep]}"`).join(',\n        ')}
+      }
+    }
+  </script>` : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -41,7 +60,7 @@ function generateHTML(name, exampleSource) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>${importMap}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; }
