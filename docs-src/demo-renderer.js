@@ -6,7 +6,7 @@
  * to a 2D canvas for display.
  */
 
-import { createGPULines } from '../webgpu-instanced-lines.js';
+import { createGPULines } from '../dist/webgpu-instanced-lines.esm.js';
 
 /**
  * Create a demo renderer instance

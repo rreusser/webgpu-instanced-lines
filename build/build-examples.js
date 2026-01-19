@@ -9,8 +9,8 @@ const rootDir = join(__dirname, '..');
 const examplesDir = join(rootDir, 'examples');
 const docsDir = join(rootDir, 'docs');
 
-// Read the main library source
-const librarySource = readFileSync(join(rootDir, 'webgpu-instanced-lines.js'), 'utf8');
+// Read the main library source (compiled from TypeScript)
+const librarySource = readFileSync(join(rootDir, 'dist/webgpu-instanced-lines.esm.js'), 'utf8');
 
 // Get all example files
 const examples = readdirSync(examplesDir)

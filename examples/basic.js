@@ -1,6 +1,6 @@
 // Basic example: Simple sine wave with round joins and caps
 
-import { createGPULines } from '../webgpu-instanced-lines.js';
+import { createGPULines } from '../dist/webgpu-instanced-lines.esm.js';
 
 export async function init(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();

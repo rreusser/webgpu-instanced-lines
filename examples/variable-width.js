@@ -1,6 +1,6 @@
 // Variable width example: Per-vertex width with cosine function and rainbow color
 
-import { createGPULines } from '../webgpu-instanced-lines.js';
+import { createGPULines } from '../dist/webgpu-instanced-lines.esm.js';
 
 export async function init(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();

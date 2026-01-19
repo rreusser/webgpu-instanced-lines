@@ -20,7 +20,7 @@ import {
   ensureDirectories
 } from './test-harness.js';
 
-import { createGPULines } from '../webgpu-instanced-lines.js';
+import { createGPULines } from '../dist/webgpu-instanced-lines.esm.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

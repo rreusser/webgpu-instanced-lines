@@ -1,406 +1,7 @@
-/**
- * WebGPU GPU Lines - Instanced line rendering for WebGPU
- *
- * Based on regl-gpu-lines, adapted for WebGPU with user-controlled vertex data.
- *
- * Key concepts:
- * - Each instance renders one line segment (from point B to point C)
- * - Uses 4-point windows: A (previous), B (start), C (end), D (next)
- * - Triangle strip covers: half of join at B, segment B→C, half of join at C
- * - User provides vertex function that computes position, width, and varyings
- * - Library handles join/cap geometry generation
- */
-
-/**
- * Parse a WGSL struct definition to extract field names and types
- * @param {string} code - WGSL code containing struct definition
- * @param {string} structName - Name of struct to find (or null to find first struct returned by a function)
- * @returns {Array<{name: string, type: string}>} Array of field definitions
- */
-function parseStructFields(code, structName) {
-  // Find struct definition
-  const structRegex = structName
-    ? new RegExp(`struct\\s+${structName}\\s*\\{([^}]+)\\}`, 's')
-    : /struct\s+(\w+)\s*\{([^}]+)\}/s;
-
-  const match = code.match(structRegex);
-  if (!match) return [];
-
-  const body = structName ? match[1] : match[2];
-  const fields = [];
-
-  // Parse fields: name: type,
-  // Match field name, colon, then type (stopping at comma or end of struct)
-  const fieldRegex = /(\w+)\s*:\s*([\w<>]+)\s*,?/g;
-  let fieldMatch;
-  while ((fieldMatch = fieldRegex.exec(body)) !== null) {
-    fields.push({
-      name: fieldMatch[1].trim(),
-      type: fieldMatch[2].trim()
-    });
-  }
-
-  return fields;
-}
-
-/**
- * Find the return type of a function
- * @param {string} code - WGSL code
- * @param {string} functionName - Function name to find
- * @returns {string|null} Return type or null
- */
-function findFunctionReturnType(code, functionName) {
-  const regex = new RegExp(`fn\\s+${functionName}\\s*\\([^)]*\\)\\s*->\\s*(\\w+)`, 's');
-  const match = code.match(regex);
-  return match ? match[1] : null;
-}
-
-/**
- * Create a WebGPU lines renderer
- *
- * @param {GPUDevice} device - WebGPU device
- * @param {object} options - Configuration options
- * @param {string} options.vertexShaderBody - WGSL code with struct definition and vertex function
- * @param {string} options.fragmentShaderBody - WGSL code for fragment output (getColor function)
- * @param {GPUTextureFormat} options.format - Output texture format
- * @param {string} [options.vertexFunction='getVertex'] - Name of user's vertex function
- * @param {string} [options.positionField='position'] - Name of position field in vertex struct
- * @param {string} [options.widthField='width'] - Name of width field in vertex struct (optional)
- * @param {string} [options.join='bevel'] - Join type: 'bevel', 'miter', or 'round'
- * @param {number} [options.maxJoinResolution=16] - Max/default resolution for round joins (determines vertex allocation)
- * @param {number} [options.miterLimit=4] - Default miter limit before switching to bevel (can override at draw-time)
- * @param {string} [options.cap='round'] - Cap type: 'round', 'square', or 'butt'
- * @param {number} [options.maxCapResolution=16] - Max/default resolution for round caps (determines vertex allocation)
- * @param {object} [options.blend] - Optional blend state for alpha blending
- * @param {GPUTextureFormat} [options.depthFormat] - Optional depth format for depth testing (e.g., 'depth24plus')
- * @param {string} [options.cullMode='none'] - Face culling mode: 'none', 'front', or 'back'
- */
-export function createGPULines(device, options) {
-  const {
-    vertexShaderBody,
-    fragmentShaderBody,
-    format,
-    vertexFunction = 'getVertex',
-    positionField = 'position',
-    widthField = 'width',
-    join = 'bevel',
-    joinResolution: defaultJoinResolution = 8,
-    maxJoinResolution = 16,
-    miterLimit: defaultMiterLimit = 4,
-    cap = 'round',
-    capResolution: userCapResolution = 8,
-    maxCapResolution = 16,
-    blend = null,
-    depthFormat = null,
-    cullMode = 'none',
-  } = options;
-
-  // Parse user's vertex struct to find varyings
-  const returnType = findFunctionReturnType(vertexShaderBody, vertexFunction);
-  if (!returnType) {
-    throw new Error(`Could not find vertex function '${vertexFunction}' in vertexShaderBody`);
-  }
-
-  const structFields = parseStructFields(vertexShaderBody, returnType);
-  if (structFields.length === 0) {
-    throw new Error(`Could not parse struct '${returnType}' in vertexShaderBody`);
-  }
-
-  // Identify position, width, and varying fields
-  const positionIdx = structFields.findIndex(f => f.name === positionField);
-  if (positionIdx === -1) {
-    throw new Error(`Position field '${positionField}' not found in struct '${returnType}'`);
-  }
-
-  const widthIdx = structFields.findIndex(f => f.name === widthField);
-  if (widthIdx === -1) {
-    throw new Error(`Width field '${widthField}' not found in struct '${returnType}'. The vertex struct must include a width field.`);
-  }
-
-  // Everything else is a varying
-  const varyings = structFields.filter((f, i) =>
-    i !== positionIdx && i !== widthIdx
-  );
-
-  const isRound = join === 'round';
-  const isBevel = join === 'bevel';
-  const effectiveMiterLimit = isBevel ? 0 : defaultMiterLimit;
-
-  const insertCaps = cap !== 'butt';
-
-  // Compute effective max resolutions based on cap type
-  let effectiveMaxCapResolution;
-  if (cap === 'butt') {
-    effectiveMaxCapResolution = 1;
-  } else if (cap === 'square') {
-    effectiveMaxCapResolution = 3;
-  } else {
-    effectiveMaxCapResolution = maxCapResolution;
-  }
-
-  // Use MAX resolutions for vertex count calculation and as draw-time defaults
-  const maxJoinRes2 = isRound ? maxJoinResolution * 2 : 2;
-  const maxCapRes2 = effectiveMaxCapResolution * 2;
-  const capScale = cap === 'square' ? [2, 2 / Math.sqrt(3)] : [1, 1];
-
-  const maxRes = Math.max(maxCapRes2, maxJoinRes2);
-  const vertCnt = maxRes + 3;
-  const vertexCountPerInstance = vertCnt * 2;
-
-  // Generate shader code
-  const vertexShader = createVertexShader({
-    userCode: vertexShaderBody,
-    vertexFunction,
-    returnType,
-    positionField,
-    widthField,
-    varyings,
-    isRound,
-  });
-
-  const fragmentShader = createFragmentShader({
-    userCode: fragmentShaderBody,
-    varyings,
-  });
-
-  // Count user varyings for debug varying locations
-  const debugVaryingStartLocation = varyings.length + 1; // +1 for lineCoord at location 0
-
-  // Create shader modules
-  const vertexModule = device.createShaderModule({
-    label: 'gpu-lines-vertex',
-    code: vertexShader
-  });
-
-  const fragmentModule = device.createShaderModule({
-    label: 'gpu-lines-fragment',
-    code: fragmentShader
-  });
-
-  // Create bind group layout for library uniforms only (group 0)
-  const uniformBindGroupLayout = device.createBindGroupLayout({
-    label: 'gpu-lines-uniforms',
-    entries: [{
-      binding: 0,
-      visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-      buffer: { type: 'uniform' }
-    }]
-  });
-
-  // Use 'auto' layout so user's bind groups are inferred from shader
-  const pipelineDescriptor = {
-    label: 'gpu-lines',
-    layout: 'auto',
-    vertex: {
-      module: vertexModule,
-      entryPoint: 'vertexMain',
-    },
-    fragment: {
-      module: fragmentModule,
-      entryPoint: 'fragmentMain',
-      targets: [blend ? { format, blend } : { format }]
-    },
-    primitive: {
-      topology: 'triangle-strip',
-      stripIndexFormat: undefined,
-      cullMode
-    }
-  };
-
-  // Add depth stencil state if depthFormat is specified
-  if (depthFormat) {
-    pipelineDescriptor.depthStencil = {
-      format: depthFormat,
-      depthWriteEnabled: true,
-      depthCompare: 'less'
-    };
-  }
-
-  const pipeline = device.createRenderPipeline(pipelineDescriptor);
-
-  // Uniform buffer layout (40 bytes):
-  // resolution(8) + vertCnt2(8) + miterLimit(4) + isRound(4) + pointCount(4) + insertCaps(4) + capScale(8)
-  const uniformBuffer = device.createBuffer({
-    label: 'gpu-lines-uniforms',
-    size: 40,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-  });
-
-  // Create uniform bind group using pipeline's inferred layout
-  const uniformBindGroup = device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(0),
-    entries: [{ binding: 0, resource: { buffer: uniformBuffer } }]
-  });
-
-  // Pre-allocate uniform data buffer and cache last values to avoid redundant writes
-  const _uniformData = new ArrayBuffer(40);
-  const _f32 = new Float32Array(_uniformData);
-  const _u32 = new Uint32Array(_uniformData);
-  // Initialize values with max resolutions as defaults (can be overridden at draw-time)
-  // Using max values means it "just works" without requiring runtime parameters
-  _f32[2] = maxCapRes2;
-  _f32[3] = maxJoinRes2;
-  _f32[4] = effectiveMiterLimit * effectiveMiterLimit;
-  _u32[5] = isRound ? 1 : 0;
-  _u32[7] = insertCaps ? 1 : 0;
-  _f32[8] = capScale[0];
-  _f32[9] = capScale[1];
-  // Track last dynamic values to detect changes
-  let _lastPointCount = -1;
-  let _lastResX = -1;
-  let _lastResY = -1;
-  let _lastCapRes2 = maxCapRes2;
-  let _lastJoinRes2 = maxJoinRes2;
-  let _lastMiterLimit2 = effectiveMiterLimit * effectiveMiterLimit;
-  let _uniformsWritten = false;
-
-  return {
-    /**
-     * Get bind group layout for user's data (group 1, 2, etc.)
-     * @param {number} index - Bind group index (1+)
-     */
-    getBindGroupLayout(index) {
-      return pipeline.getBindGroupLayout(index);
-    },
-
-    /**
-     * Update uniforms before the render pass begins.
-     * Call this before beginRenderPass() to avoid writes during the pass.
-     * @param {object} props - Draw properties
-     * @param {number} props.vertexCount - Number of vertices in the line
-     * @param {Array<number>} props.resolution - [width, height] of render target
-     * @param {number} [props.miterLimit] - Override miter limit (only for 'miter' or 'round' joins)
-     * @param {number} [props.joinResolution] - Use lower join resolution for optimization (defaults to maxJoinResolution)
-     * @param {number} [props.capResolution] - Use lower cap resolution for optimization (defaults to maxCapResolution)
-     */
-    updateUniforms(props) {
-      const { vertexCount: pointCount, resolution } = props;
-
-      // Compute effective resolution values (default to max, allow override up to max)
-      let capRes2 = maxCapRes2;
-      if (cap === 'round' && props.capResolution !== undefined) {
-        const clampedCapRes = Math.min(props.capResolution, maxCapResolution);
-        if (props.capResolution > maxCapResolution) {
-          console.warn(`capResolution ${props.capResolution} exceeds maxCapResolution ${maxCapResolution}, clamping to ${maxCapResolution}`);
-        }
-        capRes2 = clampedCapRes * 2;
-      }
-
-      let joinRes2 = maxJoinRes2;
-      if (isRound && props.joinResolution !== undefined) {
-        const clampedJoinRes = Math.min(props.joinResolution, maxJoinResolution);
-        if (props.joinResolution > maxJoinResolution) {
-          console.warn(`joinResolution ${props.joinResolution} exceeds maxJoinResolution ${maxJoinResolution}, clamping to ${maxJoinResolution}`);
-        }
-        joinRes2 = clampedJoinRes * 2;
-      }
-
-      // Compute effective miter limit (isBevel forces it to 0)
-      let miterLimit2 = _lastMiterLimit2;
-      if (!isBevel && props.miterLimit !== undefined) {
-        miterLimit2 = props.miterLimit * props.miterLimit;
-      }
-
-      // Only write if values changed
-      const needsUpdate = !_uniformsWritten ||
-        pointCount !== _lastPointCount ||
-        resolution[0] !== _lastResX ||
-        resolution[1] !== _lastResY ||
-        capRes2 !== _lastCapRes2 ||
-        joinRes2 !== _lastJoinRes2 ||
-        miterLimit2 !== _lastMiterLimit2;
-
-      if (needsUpdate) {
-        _f32[0] = resolution[0];
-        _f32[1] = resolution[1];
-        _f32[2] = capRes2;
-        _f32[3] = joinRes2;
-        _f32[4] = miterLimit2;
-        _u32[6] = pointCount;
-        device.queue.writeBuffer(uniformBuffer, 0, _uniformData);
-
-        _lastPointCount = pointCount;
-        _lastResX = resolution[0];
-        _lastResY = resolution[1];
-        _lastCapRes2 = capRes2;
-        _lastJoinRes2 = joinRes2;
-        _lastMiterLimit2 = miterLimit2;
-        _uniformsWritten = true;
-      }
-    },
-
-    /**
-     * Draw lines
-     * @param {GPURenderPassEncoder} pass - Render pass
-     * @param {object} props - Draw properties
-     * @param {number} props.vertexCount - Number of vertices in the line
-     * @param {Array<number>} props.resolution - [width, height] of render target
-     * @param {number} [props.miterLimit] - Override miter limit (only for 'miter' or 'round' joins)
-     * @param {number} [props.joinResolution] - Use lower join resolution for optimization (defaults to maxJoinResolution)
-     * @param {number} [props.capResolution] - Use lower cap resolution for optimization (defaults to maxCapResolution)
-     * @param {boolean} [props.skipUniformUpdate] - Skip uniform update (call updateUniforms first)
-     * @param {Array<GPUBindGroup>} [bindGroups] - User bind groups for groups 1, 2, etc.
-     */
-    draw(pass, props, bindGroups = []) {
-      const { vertexCount: pointCount, skipUniformUpdate } = props;
-
-      // Update uniforms if not skipped (for backwards compatibility)
-      if (!skipUniformUpdate) {
-        this.updateUniforms(props);
-      }
-
-      const instanceCount = Math.max(0, pointCount - 1);
-
-      if (instanceCount > 0) {
-        pass.setPipeline(pipeline);
-        pass.setBindGroup(0, uniformBindGroup);
-
-        // Set user's bind groups (1, 2, ...)
-        for (let i = 0; i < bindGroups.length; i++) {
-          pass.setBindGroup(i + 1, bindGroups[i]);
-        }
-
-        pass.draw(vertexCountPerInstance, instanceCount);
-      }
-    },
-
-    destroy() {
-      uniformBuffer.destroy();
-    }
-  };
-}
-
-/**
- * Create the vertex shader
- */
-function createVertexShader({
-  userCode,
-  vertexFunction,
-  returnType,
-  positionField,
-  widthField,
-  varyings,
-  isRound,
-}) {
-  // Generate varying declarations for VertexOutput
-  const varyingOutputDecls = varyings.map((v, i) =>
-    `  @location(${i + 1}) ${v.name}: ${v.type},`
-  ).join('\n');
-
-  // Library debug varyings come after user varyings
-  const debugVaryingStartLoc = varyings.length + 1;
-
-  // Generate varying interpolation code
-  const varyingInterpolation = varyings.map(v =>
-    `  let ${v.name} = mix(vertexB.${v.name}, vertexC.${v.name}, clamp(useC, 0.0, 1.0));`
-  ).join('\n');
-
-  // Generate output assignment for varyings
-  const varyingOutputAssign = varyings.map(v =>
-    `  output.${v.name} = ${v.name};`
-  ).join('\n');
-
-  return /* wgsl */`
+function ie(t,n){const a=n?new RegExp(`struct\\s+${n}\\s*\\{([^}]+)\\}`,"s"):/struct\s+(\w+)\s*\{([^}]+)\}/s,i=t.match(a);if(!i)return[];const l=n?i[1]:i[2],o=[],f=/(\w+)\s*:\s*([\w<>]+)\s*,?/g;let r;for(;(r=f.exec(l))!==null;)o.push({name:r[1].trim(),type:r[2].trim()});return o}function oe(t,n){const a=new RegExp(`fn\\s+${n}\\s*\\([^)]*\\)\\s*->\\s*(\\w+)`,"s"),i=t.match(a);return i?i[1]:null}function ce(t,n){const{vertexShaderBody:a,fragmentShaderBody:i,format:l,vertexFunction:o="getVertex",positionField:f="position",widthField:r="width",join:d="bevel",joinResolution:w=8,maxJoinResolution:m=16,miterLimit:s=4,cap:h="round",capResolution:ae=8,maxCapResolution:y=16,blend:U=null,depthFormat:_=null,cullMode:X="none"}=n,v=oe(a,o);if(!v)throw new Error(`Could not find vertex function '${o}' in vertexShaderBody`);const b=ie(a,v);if(b.length===0)throw new Error(`Could not parse struct '${v}' in vertexShaderBody`);const E=b.findIndex(e=>e.name===f);if(E===-1)throw new Error(`Position field '${f}' not found in struct '${v}'`);const O=b.findIndex(e=>e.name===r);if(O===-1)throw new Error(`Width field '${r}' not found in struct '${v}'. The vertex struct must include a width field.`);const R=b.filter((e,p)=>p!==E&&p!==O),j=d==="round",W=d==="bevel",A=W?0:s,H=h!=="butt";let D;h==="butt"?D=1:h==="square"?D=3:D=y;const I=j?m*2:2,S=D*2,G=h==="square"?[2,2/Math.sqrt(3)]:[1,1],K=(Math.max(S,I)+3)*2,Q=re({userCode:a,vertexFunction:o,returnType:v,positionField:f,widthField:r,varyings:R,isRound:j}),Z=se({userCode:i,varyings:R});R.length+1;const ee=t.createShaderModule({label:"gpu-lines-vertex",code:Q}),te=t.createShaderModule({label:"gpu-lines-fragment",code:Z});t.createBindGroupLayout({label:"gpu-lines-uniforms",entries:[{binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT,buffer:{type:"uniform"}}]});const N={label:"gpu-lines",layout:"auto",vertex:{module:ee,entryPoint:"vertexMain"},fragment:{module:te,entryPoint:"fragmentMain",targets:[U?{format:l,blend:U}:{format:l}]},primitive:{topology:"triangle-strip",stripIndexFormat:void 0,cullMode:X}};_&&(N.depthStencil={format:_,depthWriteEnabled:!0,depthCompare:"less"});const $=t.createRenderPipeline(N),T=t.createBuffer({label:"gpu-lines-uniforms",size:40,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),ne=t.createBindGroup({layout:$.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:T}}]}),F=new ArrayBuffer(40),c=new Float32Array(F),L=new Uint32Array(F);c[2]=S,c[3]=I,c[4]=A*A,L[5]=j?1:0,L[7]=H?1:0,c[8]=G[0],c[9]=G[1];let k=-1,z=-1,V=-1,q=S,Y=I,M=A*A,J=!1;return{getBindGroupLayout(e){return $.getBindGroupLayout(e)},updateUniforms(e){const{vertexCount:p,resolution:u}=e;let x=S;if(h==="round"&&e.capResolution!==void 0){const P=Math.min(e.capResolution,y);e.capResolution>y&&console.warn(`capResolution ${e.capResolution} exceeds maxCapResolution ${y}, clamping to ${y}`),x=P*2}let C=I;if(j&&e.joinResolution!==void 0){const P=Math.min(e.joinResolution,m);e.joinResolution>m&&console.warn(`joinResolution ${e.joinResolution} exceeds maxJoinResolution ${m}, clamping to ${m}`),C=P*2}let g=M;!W&&e.miterLimit!==void 0&&(g=e.miterLimit*e.miterLimit),(!J||p!==k||u[0]!==z||u[1]!==V||x!==q||C!==Y||g!==M)&&(c[0]=u[0],c[1]=u[1],c[2]=x,c[3]=C,c[4]=g,L[6]=p,t.queue.writeBuffer(T,0,F),k=p,z=u[0],V=u[1],q=x,Y=C,M=g,J=!0)},draw(e,p,u=[]){const{vertexCount:x,skipUniformUpdate:C}=p;C||this.updateUniforms(p);const g=Math.max(0,x-1);if(g>0){e.setPipeline($),e.setBindGroup(0,ne);for(let B=0;B<u.length;B++)e.setBindGroup(B+1,u[B]);e.draw(K,g)}},destroy(){T.destroy()}}}function re({userCode:t,vertexFunction:n,returnType:a,positionField:i,widthField:l,varyings:o,isRound:f}){const r=o.map((s,h)=>`  @location(${h+1}) ${s.name}: ${s.type},`).join(`
+`),d=o.length+1,w=o.map(s=>`  let ${s.name} = mix(vertexB.${s.name}, vertexC.${s.name}, clamp(useC, 0.0, 1.0));`).join(`
+`),m=o.map(s=>`  output.${s.name} = ${s.name};`).join(`
+`);return`
 //------------------------------------------------------------------------------
 // GPU Lines Vertex Shader
 //------------------------------------------------------------------------------
@@ -456,16 +57,16 @@ struct VertexOutput {
   //   y: signed distance from line center (-1 at edge, 0 at center, 1 at opposite edge)
   // Note: The sign of y indicates which side of the line the vertex is on
   @location(0) lineCoord: vec2f,
-${varyingOutputDecls}
+${r}
   // Debug varyings for visualization and debugging:
   // instanceID: Segment index (negative for cap vertices to distinguish them)
-  @location(${debugVaryingStartLoc}) instanceID: f32,
+  @location(${d}) instanceID: f32,
   // triStripCoord: Position within triangle strip (x: pair index, y: top=1/bottom=0)
-  @location(${debugVaryingStartLoc + 1}) triStripCoord: vec2f,
+  @location(${d+1}) triStripCoord: vec2f,
 }
 
 // User-provided code (bindings, structs, vertex function)
-${userCode}
+${t}
 
 // Check if a position represents a line break (NaN or w=0 signals invalid point)
 fn invalid(p: vec4f) -> bool {
@@ -504,16 +105,16 @@ fn vertexMain(
   //----------------------------------------------------------------------------
   // Call user's vertex function for each point in the window.
   // Clamp out-of-bounds indices so we can still read valid data (we'll mark them invalid below).
-  let vertexA = ${vertexFunction}(u32(clamp(A_idx, 0, N - 1)));
-  let vertexB = ${vertexFunction}(u32(B_idx));
-  let vertexC = ${vertexFunction}(u32(C_idx));
-  let vertexD = ${vertexFunction}(u32(clamp(D_idx, 0, N - 1)));
+  let vertexA = ${n}(u32(clamp(A_idx, 0, N - 1)));
+  let vertexB = ${n}(u32(B_idx));
+  let vertexC = ${n}(u32(C_idx));
+  let vertexD = ${n}(u32(clamp(D_idx, 0, N - 1)));
 
   // Extract positions from user vertex data
-  var pA = vertexA.${positionField};
-  var pB = vertexB.${positionField};
-  var pC = vertexC.${positionField};
-  var pD = vertexD.${positionField};
+  var pA = vertexA.${i};
+  var pB = vertexB.${i};
+  var pC = vertexC.${i};
+  var pD = vertexD.${i};
 
   //----------------------------------------------------------------------------
   // Determine which points are invalid (out of bounds or explicitly marked)
@@ -647,7 +248,7 @@ fn vertexMain(
   // lXY = length of segment XY in pixels
   //
   //         nAB ↑         nBC ↑         nCD ↑
-  //              \             \             \
+  //              \\             \\             \\
   //    A ------> B ==========> C ------> D
   //         tAB           tBC          tCD
   //
@@ -744,7 +345,7 @@ fn vertexMain(
   lineCoord.y = dirB * mirrorSign;
 
   // Get line width from the appropriate vertex (B for first half, C for mirrored half)
-  let width = select(vertexB.${widthField}, vertexC.${widthField}, mirror);
+  let width = select(vertexB.${l}, vertexC.${l}, mirror);
   let roundOrCap = uniforms.isRound == 1u || isCap;
 
   //----------------------------------------------------------------------------
@@ -754,7 +355,7 @@ fn vertexMain(
   // and "center" vertices (at the join center). The pattern is:
   //
   //   outer[0] -- outer[2] -- outer[4] -- ... (even indices)
-  //        \    /    \    /    \    /
+  //        \\    /    \\    /    \\    /
   //     center[1] - center[3] - center[5] ... (odd indices)
   //
   // Special vertex: i == res + 1 is the interior miter point (for sharp inner corners)
@@ -876,14 +477,14 @@ fn vertexMain(
   let useC = select(0.0, 1.0, mirror) + dx * (width / lBC);
 
   // Interpolate user varyings
-${varyingInterpolation}
+${w}
 
   //----------------------------------------------------------------------------
   // Populate output structure
   //----------------------------------------------------------------------------
   output.position = pos;
   output.lineCoord = lineCoord;
-${varyingOutputAssign}
+${m}
 
   // Debug varyings for visualization and wireframe rendering
   // instanceID: segment index, or negative for cap vertices (helps identify line ends)
@@ -898,30 +499,8 @@ ${varyingOutputAssign}
 
   return output;
 }
-`;
-}
-
-/**
- * Create the fragment shader
- */
-function createFragmentShader({ userCode, varyings }) {
-  // Generate varying declarations for FragmentInput
-  const varyingInputDecls = varyings.map((v, i) =>
-    `  @location(${i + 1}) ${v.name}: ${v.type},`
-  ).join('\n');
-
-  // Library debug varyings come after user varyings
-  const debugVaryingStartLoc = varyings.length + 1;
-
-  // Generate varying arguments for getColor call
-  const varyingArgs = varyings.map(v => `input.${v.name}`).join(', ');
-  const getColorArgs = varyingArgs ? `, ${varyingArgs}` : '';
-
-  // Detect if user's getColor expects debug varyings by checking for instanceID in the code
-  const wantsDebugVaryings = /\binstanceID\b/.test(userCode);
-  const debugArgs = wantsDebugVaryings ? ', input.instanceID, input.triStripCoord' : '';
-
-  return /* wgsl */`
+`}function se({userCode:t,varyings:n}){const a=n.map((d,w)=>`  @location(${w+1}) ${d.name}: ${d.type},`).join(`
+`),i=n.length+1,l=n.map(d=>`input.${d.name}`).join(", "),o=l?`, ${l}`:"",r=/\binstanceID\b/.test(t)?", input.instanceID, input.triStripCoord":"";return`
 //------------------------------------------------------------------------------
 // GPU Lines Fragment Shader
 //------------------------------------------------------------------------------
@@ -956,18 +535,17 @@ struct Uniforms {
 struct FragmentInput {
   // Line coordinate for SDF-based effects
   @location(0) lineCoord: vec2f,
-${varyingInputDecls}
+${a}
   // Debug: segment index (negative for caps)
-  @location(${debugVaryingStartLoc}) instanceID: f32,
+  @location(${i}) instanceID: f32,
   // Debug: position in triangle strip (for wireframe)
-  @location(${debugVaryingStartLoc + 1}) triStripCoord: vec2f,
+  @location(${i+1}) triStripCoord: vec2f,
 }
 
-${userCode}
+${t}
 
 @fragment
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
-  return getColor(input.lineCoord${getColorArgs}${debugArgs});
+  return getColor(input.lineCoord${o}${r});
 }
-`;
-}
+`}export{ce as createGPULines};

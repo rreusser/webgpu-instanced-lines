@@ -1,6 +1,6 @@
 // Multiple example: Multiple separate lines with line breaks (NaN/w=0)
 
-import { createGPULines } from '../webgpu-instanced-lines.js';
+import { createGPULines } from '../dist/webgpu-instanced-lines.esm.js';
 
 export async function init(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();
