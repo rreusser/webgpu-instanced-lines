@@ -242,9 +242,21 @@ async function run() {
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
   });
 
-  // Build GPU lines options
+  // Determine if blending is needed
+  const needsBlend = shader.type === 'sdf' ||
+    (shader.type === 'solid' && (shader.alpha || 0.5) < 1.0) ||
+    config.blend;
+
+  const blend = needsBlend
+    ? (config.blend || {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+        alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' }
+      })
+    : undefined;
+
+  // Build GPU lines options using WebGPU native state objects
   const gpuOptions = {
-    format,
+    colorTargets: blend ? { format, blend } : { format },
     join: options.join || 'miter',
     cap: options.cap || 'square',
     miterLimit: options.miterLimit,
@@ -255,18 +267,10 @@ async function run() {
   };
 
   if (config.depth) {
-    gpuOptions.depthFormat = 'depth24plus';
-  }
-
-  // Add blending
-  const needsBlend = shader.type === 'sdf' ||
-    (shader.type === 'solid' && (shader.alpha || 0.5) < 1.0) ||
-    config.blend;
-
-  if (needsBlend) {
-    gpuOptions.blend = config.blend || {
-      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-      alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' }
+    gpuOptions.depthStencil = {
+      format: 'depth24plus',
+      depthWriteEnabled: true,
+      depthCompare: 'less'
     };
   }
 

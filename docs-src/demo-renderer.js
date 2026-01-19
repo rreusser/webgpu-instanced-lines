@@ -221,7 +221,7 @@ export function createDemoRenderer(device, context, canvas, format) {
     }
 
     const gpuLines = createGPULines(device, {
-      format,
+      colorTargets: blend ? { format, blend } : { format },
       join,
       joinResolution,
       miterLimit,
@@ -229,7 +229,6 @@ export function createDemoRenderer(device, context, canvas, format) {
       capResolution,
       vertexShaderBody,
       fragmentShaderBody: fragmentShader,
-      blend
     });
 
     pipelineCache.set(key, gpuLines);

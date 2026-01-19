@@ -492,20 +492,25 @@
 
     // Use max resolutions at init time to allow runtime adjustment up to these values
     // Runtime values (miterLimit, joinResolution, capResolution) are passed to draw()
+    const blend = useBlend ? {
+      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
+    } : undefined;
+
     const gpuLines = createGPULines(device, {
-      format: canvasFormat,
+      colorTargets: blend ? { format: canvasFormat, blend } : { format: canvasFormat },
+      depthStencil: depthFormat ? {
+        format: depthFormat,
+        depthWriteEnabled: true,
+        depthCompare: 'less'
+      } : undefined,
+      primitive: { cullMode: cullBackFaces ? 'back' : 'none' },
       join: joinType,
       maxJoinResolution: 16,  // Allow up to 16 at runtime
       maxCapResolution: 16,   // Allow up to 16 at runtime
       cap: capType,
       vertexShaderBody,
       fragmentShaderBody,
-      blend: useBlend ? {
-        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-        alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
-      } : null,
-      depthFormat,
-      cullMode: cullBackFaces ? 'back' : 'none'
     });
 
     // Create view matrix buffer
