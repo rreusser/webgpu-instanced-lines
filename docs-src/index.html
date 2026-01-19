@@ -138,7 +138,7 @@
     const joinTypeInput = Inputs.select(['bevel', 'miter', 'round'], { label: 'Join type', value: 'miter' });
     const joinType = view(joinTypeInput);
 
-    const capTypeInput = Inputs.select(['round', 'square', 'none'], { label: 'Cap type', value: 'round' });
+    const capTypeInput = Inputs.select(['round', 'square', 'butt'], { label: 'Cap type', value: 'round' });
     const capType = view(capTypeInput);
 
     const patternInput = Inputs.select(['wave', 'zigzag', 'spiral'], { label: 'Pattern', value: 'zigzag' });
@@ -757,7 +757,7 @@
   <script id="20" type="text/markdown">
     #### `cap`
 
-    Controls how line endpoints are rendered. Options are `'round'`, `'square'`, and `'none'`.
+    Controls how line endpoints are rendered. Options are `'round'`, `'square'`, and `'butt'`.
   </script>
   <script id="21" type="module">
     {
@@ -766,7 +766,7 @@
 
       const capRound = createDemoCanvas('demo-cap-round');
       const capSquare = createDemoCanvas('demo-cap-square');
-      const capNone = createDemoCanvas('demo-cap-none');
+      const capButt = createDemoCanvas('demo-cap-butt');
 
       display(html`<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start;">
         <figure style="margin: 0; text-align: center;">
@@ -778,15 +778,15 @@
           <figcaption><code>cap: 'square'</code></figcaption>
         </figure>
         <figure style="margin: 0; text-align: center;">
-          ${capNone}
-          <figcaption><code>cap: 'none'</code></figcaption>
+          ${capButt}
+          <figcaption><code>cap: 'butt'</code></figcaption>
         </figure>
       </div>`);
 
       const baseOpts = { pattern: 'cap-demo', lineWidth: 50, width: 200, height: 120 };
       await demoRenderer.renderToCanvas(capRound, { ...baseOpts, cap: 'round' });
       await demoRenderer.renderToCanvas(capSquare, { ...baseOpts, cap: 'square' });
-      await demoRenderer.renderToCanvas(capNone, { ...baseOpts, cap: 'none' });
+      await demoRenderer.renderToCanvas(capButt, { ...baseOpts, cap: 'butt' });
     }
   </script>
   <script id="22" type="text/markdown">

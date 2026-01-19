@@ -5,8 +5,8 @@
   },
   "lineWidth": 20,
   "options": {
-    "join": "miter",
-    "cap": "none"
+    "join": "round",
+    "cap": "butt"
   },
   "positions": [
     [

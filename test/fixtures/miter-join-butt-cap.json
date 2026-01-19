@@ -7,7 +7,7 @@
   "options": {
     "join": "miter",
     "miterLimit": 4,
-    "cap": "none"
+    "cap": "butt"
   },
   "pattern": "zigzag",
   "shader": {

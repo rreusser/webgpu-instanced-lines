@@ -6,7 +6,7 @@
   "lineWidth": 20,
   "options": {
     "join": "round",
-    "cap": "none"
+    "cap": "butt"
   },
   "positions": [
     [

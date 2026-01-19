@@ -61,9 +61,10 @@ The geometry is carefully generated to optimize for high-performance rendering w
 
 ### Limitations
 
-- The library does not handle self-intersecting lines.
+- Does not apply special handling for self-intersecting lines.
+- Does not implement [`arcs`](https://www.w3.org/TR/svg-strokes/#CurvatureCalculation) end cap type.
 - Rapidly varying line widths render incorrectly.
-- World-space line widths require custom work in the vertex shader function.
+- World-space line widths require custom computation in the vertex shader function.
 
 ## API Reference
 

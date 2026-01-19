@@ -67,12 +67,10 @@ function findFunctionReturnType(code, functionName) {
  * @param {string} [options.positionField='position'] - Name of position field in vertex struct
  * @param {string} [options.widthField='width'] - Name of width field in vertex struct (optional)
  * @param {string} [options.join='bevel'] - Join type: 'bevel', 'miter', or 'round'
- * @param {number} [options.joinResolution=8] - Default resolution for round joins (can override at draw-time)
- * @param {number} [options.maxJoinResolution=16] - Maximum resolution for round joins (determines vertex allocation)
+ * @param {number} [options.maxJoinResolution=16] - Max/default resolution for round joins (determines vertex allocation)
  * @param {number} [options.miterLimit=4] - Default miter limit before switching to bevel (can override at draw-time)
- * @param {string} [options.cap='round'] - Cap type: 'round', 'square', or 'none'
- * @param {number} [options.capResolution=8] - Default resolution for round caps (can override at draw-time)
- * @param {number} [options.maxCapResolution=16] - Maximum resolution for round caps (determines vertex allocation)
+ * @param {string} [options.cap='round'] - Cap type: 'round', 'square', or 'butt'
+ * @param {number} [options.maxCapResolution=16] - Max/default resolution for round caps (determines vertex allocation)
  * @param {object} [options.blend] - Optional blend state for alpha blending
  * @param {GPUTextureFormat} [options.depthFormat] - Optional depth format for depth testing (e.g., 'depth24plus')
  */
@@ -126,21 +124,11 @@ export function createGPULines(device, options) {
   const isBevel = join === 'bevel';
   const effectiveMiterLimit = isBevel ? 0 : defaultMiterLimit;
 
-  const insertCaps = cap !== 'none';
-
-  // Compute default cap resolution based on cap type
-  let defaultCapResolution;
-  if (cap === 'none') {
-    defaultCapResolution = 1;
-  } else if (cap === 'square') {
-    defaultCapResolution = 3;
-  } else {
-    defaultCapResolution = userCapResolution;
-  }
+  const insertCaps = cap !== 'butt';
 
   // Compute effective max resolutions based on cap type
   let effectiveMaxCapResolution;
-  if (cap === 'none') {
+  if (cap === 'butt') {
     effectiveMaxCapResolution = 1;
   } else if (cap === 'square') {
     effectiveMaxCapResolution = 3;
@@ -148,7 +136,7 @@ export function createGPULines(device, options) {
     effectiveMaxCapResolution = maxCapResolution;
   }
 
-  // Use MAX resolutions for vertex count calculation (allows runtime values up to max)
+  // Use MAX resolutions for vertex count calculation and as draw-time defaults
   const maxJoinRes2 = isRound ? maxJoinResolution * 2 : 2;
   const maxCapRes2 = effectiveMaxCapResolution * 2;
   const capScale = cap === 'square' ? [2, 2 / Math.sqrt(3)] : [1, 1];
@@ -156,10 +144,6 @@ export function createGPULines(device, options) {
   const maxRes = Math.max(maxCapRes2, maxJoinRes2);
   const vertCnt = maxRes + 3;
   const vertexCountPerInstance = vertCnt * 2;
-
-  // Default values for draw-time (when not overridden)
-  const defaultJoinRes2 = isRound ? defaultJoinResolution * 2 : 2;
-  const defaultCapRes2 = defaultCapResolution * 2;
 
   // Generate shader code
   const vertexShader = createVertexShader({
@@ -282,9 +266,9 @@ export function createGPULines(device, options) {
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
      * @param {Array<number>} props.resolution - [width, height] of render target
-     * @param {number} [props.miterLimit] - Override miter limit (only applies if join is 'miter' or 'round')
-     * @param {number} [props.joinResolution] - Override join resolution (only applies if join is 'round')
-     * @param {number} [props.capResolution] - Override cap resolution (only applies if cap is 'round')
+     * @param {number} [props.miterLimit] - Override miter limit (only for 'miter' or 'round' joins)
+     * @param {number} [props.joinResolution] - Use lower join resolution for optimization (defaults to maxJoinResolution)
+     * @param {number} [props.capResolution] - Use lower cap resolution for optimization (defaults to maxCapResolution)
      */
     updateUniforms(props) {
       const { vertexCount: pointCount, resolution } = props;
@@ -348,9 +332,9 @@ export function createGPULines(device, options) {
      * @param {object} props - Draw properties
      * @param {number} props.vertexCount - Number of vertices in the line
      * @param {Array<number>} props.resolution - [width, height] of render target
-     * @param {number} [props.miterLimit] - Override miter limit (only applies if join is 'miter' or 'round')
-     * @param {number} [props.joinResolution] - Override join resolution (only applies if join is 'round')
-     * @param {number} [props.capResolution] - Override cap resolution (only applies if cap is 'round')
+     * @param {number} [props.miterLimit] - Override miter limit (only for 'miter' or 'round' joins)
+     * @param {number} [props.joinResolution] - Use lower join resolution for optimization (defaults to maxJoinResolution)
+     * @param {number} [props.capResolution] - Use lower cap resolution for optimization (defaults to maxCapResolution)
      * @param {boolean} [props.skipUniformUpdate] - Skip uniform update (call updateUniforms first)
      * @param {Array<GPUBindGroup>} [bindGroups] - User bind groups for groups 1, 2, etc.
      */

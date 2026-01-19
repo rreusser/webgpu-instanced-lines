@@ -363,7 +363,7 @@ export function createDemoRenderer(device, context, canvas, format) {
    * @param {string} options.pattern - Point pattern ('zigzag', 'spiral', 'wave', etc.)
    * @param {number} options.lineWidth - Line width in pixels
    * @param {string} options.join - Join type ('bevel', 'miter', 'round')
-   * @param {string} options.cap - Cap type ('round', 'square', 'none')
+   * @param {string} options.cap - Cap type ('round', 'square', 'butt')
    * @param {number} options.sdfStrokeWidth - SDF stroke width (0 for standard)
    * @param {boolean} options.lineBreak - Insert line break in middle
    * @param {number} options.width - Output width

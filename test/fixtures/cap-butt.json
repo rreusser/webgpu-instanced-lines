@@ -6,7 +6,7 @@
   "lineWidth": 60,
   "options": {
     "join": "bevel",
-    "cap": "none"
+    "cap": "butt"
   },
   "pattern": "straight",
   "shader": {

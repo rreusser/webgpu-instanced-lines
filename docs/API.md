@@ -22,11 +22,11 @@ Controls how line segments are connected at vertices. Options are `'bevel'`, `'m
 
 ### `cap`
 
-Controls how line endpoints are rendered. Options are `'round'`, `'square'`, and `'none'`.
+Controls how line endpoints are rendered. Options are `'round'`, `'square'`, and `'butt'`.
 
-| `cap: 'round'` | `cap: 'square'` | `cap: 'none'` |
+| `cap: 'round'` | `cap: 'square'` | `cap: 'butt'` |
 |:---:|:---:|:---:|
-| <img src="images/cap-round.png" width="200"> | <img src="images/cap-square.png" width="200"> | <img src="images/cap-none.png" width="200"> |
+| <img src="images/cap-round.png" width="200"> | <img src="images/cap-square.png" width="200"> | <img src="images/cap-butt.png" width="200"> |
 
 ### `miterLimit`
 
@@ -36,13 +36,11 @@ When using `join: 'miter'`, this controls when sharp angles fall back to bevel j
 |:---:|:---:|:---:|
 | <img src="images/miter-1.png" width="200"> | <img src="images/miter-4.png" width="200"> | <img src="images/miter-10.png" width="200"> |
 
-### `joinResolution` and `capResolution`
-
-Control the number of triangles used for round joins and caps. Higher values create smoother curves. Default is `8`. Can be overridden at draw-time (up to the max resolution).
-
 ### `maxJoinResolution` and `maxCapResolution`
 
-Maximum resolution values that can be used at draw-time. These determine vertex buffer allocation at init-time. Default is `16`. Set higher if you need finer resolution at draw-time; set lower to reduce vertex count per instance.
+Maximum resolution values for round joins and caps. These determine vertex buffer allocation at init-time and are also used as the default at draw-time. Default is `16`. Set higher if you need finer resolution; set lower to reduce vertex count per instance.
+
+At draw-time, you can optionally pass `joinResolution` or `capResolution` to use a lower resolution (up to the max). This is useful for optimization if you don't need full resolution.
 
 | `joinResolution: 2` | `joinResolution: 4` | `joinResolution: 16` |
 |:---:|:---:|:---:|
