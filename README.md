@@ -1,6 +1,14 @@
 # WebGPU Instanced Lines
 
-![lines](https://raw.githubusercontent.com/rreusser/webgpu-instanced-lines/main/docs/images/lines.png)
+[![lines](https://raw.githubusercontent.com/rreusser/webgpu-instanced-lines/main/docs/images/lines.png)](https://rreusser.github.io/webgpu-instanced-lines/)
+
+[API documentation →](./docs/API.md)
+
+[Live example →](https://rreusser.github.io/webgpu-instanced-lines/)
+
+[All examples →](https://github.com/rreusser/webgpu-instanced-lines?tab=readme-ov-file#examples)
+
+[npm package →](https://www.npmjs.com/package/webgpu-instanced-lines)
 
 High-performance, flexible GPU-accelerated line rendering for WebGPU. A direct port of [regl-gpu-lines](https://github.com/rreusser/regl-gpu-lines) to WebGPU.
 
