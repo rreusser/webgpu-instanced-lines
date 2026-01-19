@@ -121,14 +121,14 @@ createGPULines(device, {
 
 The vertex shader body defines how line positions and per-vertex data are computed. You provide bind group declarations (group 1+) for your data, a struct defining the vertex output, and a vertex function that returns the struct given a point index.
 
-The `position` field is a `vec4f` in clip space: `x` and `y` range from -1 to 1, `z` is depth, and `w` should be 1 for valid points or 0 (or NaN) for line breaks.
+The `position` field is a `vec4f` in clip space: `x` and `y` range from -1 to 1, `z` is depth, and `w` must be non-zero for valid points (0 or NaN signals a line break).
 
 ```wgsl
 @group(1) @binding(0) var<storage, read> positions: array<vec4f>;
 @group(1) @binding(1) var<uniform> viewMatrix: mat4x4f;
 
 struct Vertex {
-  position: vec4f,  // Clip-space position (w=0 or NaN for line breaks)
+  position: vec4f,  // Clip-space position (w must be non-zero; w=0 or NaN for line breaks)
   width: f32,       // Line width in pixels
   // Additional fields become varyings passed to fragment shader
 }
