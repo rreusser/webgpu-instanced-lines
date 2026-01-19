@@ -394,9 +394,9 @@ struct VertexOutput {
   // Clip-space position
   @builtin(position) position: vec4f,
   // Line coordinate for SDF-based rendering:
-  //   x: position along cap (-1 to 1 for caps, 0 for segments/joins)
+  //   x: signed distance into cap (-1 to 0 for start caps, 0 to +1 for end caps, 0 for segments/joins)
   //   y: signed distance from line center (-1 at edge, 0 at center, 1 at opposite edge)
-  // Note: The sign of y indicates which side of the line the vertex is on
+  // Note: The sign of x indicates which cap (start vs end), sign of y indicates which side of the line
   @location(0) lineCoord: vec2f,
 ${varyingOutputDecls}
   // Debug varyings for visualization and debugging:
@@ -765,8 +765,11 @@ ${clampIndices ? `  // With clampIndices, out-of-bounds indices trigger automati
             xy = xy * uniforms.capScale;
           }
           // For caps, lineCoord encodes position within the cap for SDF rendering
+          // lineCoord.x sign indicates cap direction:
+          //   Start cap (negative-facing): -1 at tip to 0 at body
+          //   End cap (positive-facing): 0 at body to +1 at tip
           let prevLineCoordY = lineCoord.y;
-          lineCoord.x = xy.y * prevLineCoordY;
+          lineCoord.x = select(-xy.y, xy.y, mirror);
           lineCoord.y = xy.x * prevLineCoordY;
         }
       } else {
@@ -873,7 +876,7 @@ function createFragmentShader({ userCode, varyings }) {
 // then calls the user-provided getColor() function to compute the final color.
 //
 // Inputs:
-//   lineCoord.x: for caps, position along the cap (-1 to 1); for joins/segments, 0
+//   lineCoord.x: for caps, signed distance into cap (-1 to 0 for start caps, 0 to +1 for end caps); 0 for segments/joins
 //   lineCoord.y: signed distance from line center (-1 to 1, edges at ±1)
 //
 // These coordinates can be used to implement:

@@ -274,7 +274,7 @@ If your shader code references \`instanceID\`, the library will automatically pa
 
 | Component | Segments/Joins | Caps | Description |
 |-----------|----------------|------|-------------|
-| \`lineCoord.x\` | 0 | sin(θ) × sign | Always 0 for segments. Varies around the semicircle for caps. |
+| \`lineCoord.x\` | 0 | -1 to +1 | Always 0 for segments. Signed distance into cap: start caps go -1 (tip) to 0 (body), end caps go 0 (body) to +1 (tip). |
 | \`lineCoord.y\` | -1 to 1 | cos(θ) × sign | Position across the line. 0 at center, ±1 at edges. |
 
 The \`lineCoord\` values are designed for SDF (signed distance field) rendering. \`length(lineCoord)\` gives radial distance from line center (0 at center, 1 at edge). For segments, \`length(lineCoord) = abs(lineCoord.y)\` since x=0. For caps, \`length(lineCoord) = 1\` on the outer edge (unit circle).
