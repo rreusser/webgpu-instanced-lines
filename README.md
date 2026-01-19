@@ -1,6 +1,8 @@
 # WebGPU Instanced Lines
 
-High-performance, flexible GPU-accelerated line rendering for WebGPU. This is a direct port of [regl-gpu-lines](https://github.com/rreusser/regl-gpu-lines) to WebGPU. The focus is on speed and customizability rather than sophisticated stroke expansion algorithms.
+![foo](./docs/images/lines.png)
+
+High-performance, flexible GPU-accelerated line rendering for WebGPU. A direct port of [regl-gpu-lines](https://github.com/rreusser/regl-gpu-lines) to WebGPU.
 
 For background on GPU line rendering, see Matt DesLauriers' [Drawing Lines is Hard](https://mattdesl.svbtle.com/drawing-lines-is-hard) and Rye Terrell's [Instanced Line Rendering](https://wwwtyro.net/2019/11/18/instanced-lines.html).
 

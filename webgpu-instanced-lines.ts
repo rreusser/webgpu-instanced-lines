@@ -3,7 +3,6 @@
  *
  * Based on regl-gpu-lines, adapted for WebGPU with user-controlled vertex data.
  *
- * Key concepts:
  * - Each instance renders one line segment (from point B to point C)
  * - Uses 4-point windows: A (previous), B (start), C (end), D (next)
  * - Triangle strip covers: half of join at B, segment B→C, half of join at C
@@ -84,6 +83,13 @@ export interface GPULinesOptions {
   capResolution?: number;
   /** Max resolution for round caps (default: 16) */
   maxCapResolution?: number;
+  /**
+   * Whether to clamp indices before passing to getVertex (default: true).
+   * When true: indices are clamped to [0, N-1] and out-of-bounds triggers end caps.
+   * When false: raw indices (including -1 and N) are passed as i32, allowing
+   * custom wrapping logic for closed loops. getVertex must use i32 parameter type.
+   */
+  clampIndices?: boolean;
 }
 
 /** Properties for updating uniforms */
@@ -125,6 +131,7 @@ interface VertexShaderOptions {
   positionField: string;
   widthField: string;
   varyings: StructField[];
+  clampIndices: boolean;
 }
 
 /** Internal options for creating fragment shader */
@@ -190,6 +197,7 @@ export function createGPULines(device: GPUDevice, options: GPULinesOptions): GPU
     miterLimit: defaultMiterLimit = 4,
     cap = 'square',
     maxCapResolution = 8,
+    clampIndices = true,
   } = options;
 
   // Normalize colorTargets to array
@@ -267,6 +275,7 @@ export function createGPULines(device: GPUDevice, options: GPULinesOptions): GPU
     positionField,
     widthField,
     varyings,
+    clampIndices,
   });
 
   const fragmentShader = createFragmentShader({
@@ -454,6 +463,7 @@ function createVertexShader({
   positionField,
   widthField,
   varyings,
+  clampIndices,
 }: VertexShaderOptions): string {
   // Generate varying declarations for VertexOutput
   const varyingOutputDecls = varyings.map((v, i) =>
@@ -482,7 +492,6 @@ function createVertexShader({
 // Each instance renders one line segment from point B to point C, along with half
 // of the join at each end. The geometry is generated as a triangle strip.
 //
-// Key concepts:
 // - 4-point window: A (previous), B (start), C (end), D (next)
 // - Each instance covers: half of join at B + segment B→C + half of join at C
 // - The triangle strip is divided into two halves that "mirror" each other
@@ -493,9 +502,6 @@ function createVertexShader({
 // and "inner" points (at the center of the join fan). For joins, vertices are
 // arranged as a fan that smoothly transitions between incoming and outgoing
 // segment directions.
-//
-// For further details, see: https://wwwtyro.net/2019/11/18/instanced-lines.html
-// and the GPU lines library documentation.
 //
 //------------------------------------------------------------------------------
 
@@ -576,11 +582,15 @@ fn vertexMain(
   // Fetch vertex data for all four points in the window
   //----------------------------------------------------------------------------
   // Call user's vertex function for each point in the window.
-  // Clamp out-of-bounds indices so we can still read valid data (we'll mark them invalid below).
+${clampIndices ? `  // Clamp out-of-bounds indices so we can still read valid data (we'll mark them invalid below).
   let vertexA = ${vertexFunction}(u32(clamp(A_idx, 0, N - 1)));
   let vertexB = ${vertexFunction}(u32(B_idx));
   let vertexC = ${vertexFunction}(u32(C_idx));
-  let vertexD = ${vertexFunction}(u32(clamp(D_idx, 0, N - 1)));
+  let vertexD = ${vertexFunction}(u32(clamp(D_idx, 0, N - 1)));` : `  // Pass raw indices (may be negative or >= N) - user handles wrapping/validation.
+  let vertexA = ${vertexFunction}(A_idx);
+  let vertexB = ${vertexFunction}(B_idx);
+  let vertexC = ${vertexFunction}(C_idx);
+  let vertexD = ${vertexFunction}(D_idx);`}
 
   // Extract positions from user vertex data
   var pA = vertexA.${positionField};
@@ -594,8 +604,11 @@ fn vertexMain(
   // A point is invalid if it's outside the polyline bounds or if the user
   // marked it invalid (w=0 or NaN). Invalid endpoints A or D indicate line
   // ends where caps should be drawn instead of joins.
+${clampIndices ? `  // With clampIndices, out-of-bounds indices trigger automatic end caps.
   let aOutOfBounds = A_idx < 0;
-  let dOutOfBounds = D_idx >= N;
+  let dOutOfBounds = D_idx >= N;` : `  // Without clampIndices, user handles bounds - only check for invalid positions.
+  let aOutOfBounds = false;
+  let dOutOfBounds = false;`}
   var aInvalid = aOutOfBounds || invalid(pA);
   var dInvalid = dOutOfBounds || invalid(pD);
   let bInvalid = invalid(pB);
@@ -1003,7 +1016,7 @@ function createFragmentShader({ userCode, varyings }: FragmentShaderOptions): st
 // The fragment shader receives interpolated line coordinates and user varyings,
 // then calls the user-provided getColor() function to compute the final color.
 //
-// Key inputs:
+// Inputs:
 //   lineCoord.x: for caps, position along the cap (-1 to 1); for joins/segments, 0
 //   lineCoord.y: signed distance from line center (-1 to 1, edges at ±1)
 //

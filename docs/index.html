@@ -1,6 +1,14 @@
 <!doctype html>
 <notebook theme="air">
   <title>WebGPU Instanced Lines</title>
+  <script id="0" type="module">
+    display(html`<style>
+      /* Hide static image tables from API.md since we have live-computed versions */
+      table:has(img[src^="images/"]) {
+        display: none;
+      }
+    </style>`);
+  </script>
   <script id="1" type="module">
     const link = html`<a href="https://github.com/rreusser/webgpu-instanced-lines" target="_blank" style="
       display: inline-flex;
@@ -26,7 +34,21 @@
   <script id="1b" type="text/markdown">
     # WebGPU Instanced Lines
 
-    High-performance, flexible GPU-accelerated line rendering for WebGPU. This is a direct port of [regl-gpu-lines](https://github.com/rreusser/regl-gpu-lines) to WebGPU. The focus is on speed and customizability rather than sophisticated stroke expansion algorithms. Drag handles to edit vertices, drag the background to pan, and scroll to zoom. Enable **Debug view** to see the underlying triangle strip structure.
+    High-performance, flexible GPU-accelerated line rendering for WebGPU. This is a direct port of [regl-gpu-lines](https://github.com/rreusser/regl-gpu-lines) to WebGPU. The focus is on speed and customizability rather than sophisticated stroke expansion algorithms.
+
+    **Contents**
+    - [Installation](#installation)
+    - [Usage](#usage)
+    - [How It Works](#how-it-works)
+    - [API Reference](#api-reference)
+      - [Options](#options)
+      - [Drawing](#drawing)
+      - [Custom Shaders](#custom-shaders)
+
+    ## Interactive demo
+
+    The visualization below shows basic line rendering with debug visualizations when **Debug view** is enabled.
+
   </script>
   <script id="2" type="module">
     // Initialize WebGPU for interactive demo
@@ -133,7 +155,7 @@
     }));
   </script>
   <script id="6" type="module">
-    const lineWidthInput = Inputs.range([1, 100], { label: 'Line width', value: 50, step: 0.5 });
+    const lineWidthInput = Inputs.range([1, 100], { label: 'Line width', value: 70, step: 0.5 });
     const lineWidth = view(lineWidthInput);
 
     const joinTypeInput = Inputs.select(['bevel', 'miter', 'round'], { label: 'Join type', value: 'miter' });
@@ -195,6 +217,9 @@
       disabled: capType !== 'round'
     });
     const capResolution = view(capResolutionInput);
+
+    const downloadButtonInput = Inputs.button('Download PNG');
+    const downloadButton = view(downloadButtonInput);
   </script>
   <script id="10" type="module">
     display(html`<div class="lines-controls">
@@ -213,6 +238,7 @@
       ${debugViewInput}
       ${depthTestInput}
       ${cullBackFacesInput}
+      ${downloadButtonInput}
     </div>`);
   </script>
   <script id="11" type="module">
@@ -638,17 +664,17 @@
     });
   </script>
   <script id="14a" type="module">
-    function downloadURI(uri, filename) {
-      const link = document.createElement("a");
-      link.target = '_blank';
-      link.download = filename;
-      link.href = uri;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+    if (downloadButton > 0) {
+      function downloadURI(uri, filename) {
+        const link = document.createElement("a");
+        link.target = '_blank';
+        link.download = filename;
+        link.href = uri;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
 
-    async function downloadInteractiveDemo() {
       // Force a render
       renderState.dirty = true;
 
@@ -660,12 +686,6 @@
       const uri = canvas.toDataURL('image/png');
       downloadURI(uri, 'webgpu-lines-demo.png');
     }
-
-    const downloadBtn = html`<button style="padding: 4px 12px; cursor: pointer; margin-left: 8px;">Download PNG</button>`;
-    downloadBtn.onclick = downloadInteractiveDemo;
-
-    // Add the button to the controls
-    document.querySelector('.lines-controls')?.appendChild(downloadBtn);
   </script>
   <script id="14b" type="text/markdown">
     ---

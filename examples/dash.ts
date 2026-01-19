@@ -12,10 +12,10 @@ export async function init(canvas: HTMLCanvasElement) {
   context.configure({ device, format, alphaMode: 'premultiplied' });
 
   const width = 40;
-  const dashLength = 4;
+  const dashLength = 1;
 
   // Construct initial path as a sine wave
-  const n = 11;
+  const n = 51;
   const path: [number, number][] = [];
   for (let i = 0; i < n; i++) {
     const t = (i / (n - 1) * 2.0 - 1.0) * 0.8;

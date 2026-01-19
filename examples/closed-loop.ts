@@ -1,4 +1,7 @@
 // Closed loop example: Seven-sided star shape
+//
+// For closed loops, use modular arithmetic in getVertex to wrap indices.
+// Pass vertexCount = n + 3 to provide extra indices for proper join computation.
 
 import { createGPULines } from '../webgpu-instanced-lines';
 
@@ -11,12 +14,11 @@ export async function init(canvas: HTMLCanvasElement) {
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'premultiplied' });
 
-  // A seven-sided star, with first three vertices repeated at end for closed loop
+  // A seven-sided star - only store n unique points
   const n = 7;
-  const pointCount = n + 3;
-  const positions = new Float32Array(pointCount * 4);
+  const positions = new Float32Array(n * 4);
 
-  for (let i = 0; i < pointCount; i++) {
+  for (let i = 0; i < n; i++) {
     const t = i / n;
     const theta = t * Math.PI * 2 * 2;
     const r = 0.7;
@@ -41,17 +43,21 @@ export async function init(canvas: HTMLCanvasElement) {
       }
     },
     join: 'round',
-    // No cap needed for closed loop
+    cap: 'butt', // No caps needed for closed loop
+    clampIndices: false, // Pass raw indices for custom wrapping
     vertexShaderBody: /* wgsl */`
       @group(1) @binding(0) var<storage, read> positions: array<vec4f>;
+
+      const n = ${n};
 
       struct Vertex {
         position: vec4f,
         width: f32,
       }
 
-      fn getVertex(index: u32) -> Vertex {
-        let p = positions[index];
+      fn getVertex(index: i32) -> Vertex {
+        // Use modular arithmetic to wrap indices for closed loop
+        let p = positions[(index % n + n) % n];
         // Apply aspect ratio correction
         let aspect = uniforms.resolution.x / uniforms.resolution.y;
         return Vertex(vec4f(p.x, p.y * aspect, p.z, p.w), 50.0 * ${devicePixelRatio.toFixed(1)});
@@ -80,8 +86,9 @@ export async function init(canvas: HTMLCanvasElement) {
       }]
     });
 
+    // Pass n + 3 to provide extra indices for join computation at the loop closure
     drawLines.draw(pass, {
-      vertexCount: pointCount,
+      vertexCount: n + 1,
       resolution: [canvas.width, canvas.height]
     }, [dataBindGroup]);
 
