@@ -47,7 +47,14 @@ export async function init(canvas) {
   device.queue.writeBuffer(positionBuffer, 0, positions);
 
   const drawLines = createGPULines(device, {
-    format,
+    colorTargets: {
+      format,
+      blend: {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+        alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
+      }
+    },
+    primitive: { cullMode: 'back' },
     join: 'round',
     cap: 'round',
     vertexShaderBody: /* wgsl */`
@@ -75,13 +82,6 @@ export async function init(canvas) {
         return vec4f(r, g, b, 0.7);
       }
     `,
-    blend: {
-      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
-    },
-    depthWrite: false,
-    depthCompare: 'always',
-    cullMode: 'back'
   });
 
   const dataBindGroup = device.createBindGroup({

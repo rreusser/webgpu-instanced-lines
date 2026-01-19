@@ -38,8 +38,12 @@ export async function init(canvas) {
   }));
 
   const drawLines = createGPULines(device, {
-    format,
-    depthFormat: 'depth24plus',
+    colorTargets: { format },
+    depthStencil: {
+      format: 'depth24plus',
+      depthWriteEnabled: true,
+      depthCompare: 'less',
+    },
     join: 'round',
     cap: 'round',
     joinResolution: 1,
@@ -92,8 +96,6 @@ export async function init(canvas) {
         return vec4f(color, 1.0);
       }
     `,
-    depthWrite: true,
-    depthCompare: 'less'
   });
 
   // Create bind groups for each spiral

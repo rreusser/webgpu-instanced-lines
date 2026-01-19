@@ -44,7 +44,7 @@ export async function init(canvas) {
 
   function createDrawLines(join) {
     return createGPULines(device, {
-      format,
+      colorTargets: { format },
       join,
       cap: 'round',
       miterLimit: 3.0,
@@ -83,8 +83,6 @@ export async function init(canvas) {
           return vec4f(color, 1.0);
         }
       `,
-      depthWrite: false,
-      depthCompare: 'always'
     });
   }
 

@@ -29,7 +29,7 @@ export async function init(canvas) {
   device.queue.writeBuffer(positionBuffer, 0, positions);
 
   const drawLines = createGPULines(device, {
-    format,
+    colorTargets: { format },
     join: 'round',
     cap: 'round',
     vertexShaderBody: /* wgsl */`
@@ -60,8 +60,6 @@ export async function init(canvas) {
         return vec4f(r, g, b, 1.0);
       }
     `,
-    depthWrite: false,
-    depthCompare: 'always'
   });
 
   const dataBindGroup = device.createBindGroup({

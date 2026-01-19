@@ -29,7 +29,7 @@ export async function init(canvas) {
   device.queue.writeBuffer(positionBuffer, 0, positions);
 
   const drawLines = createGPULines(device, {
-    format,
+    colorTargets: { format },
     join: 'round',
     cap: 'round',
     vertexShaderBody: /* wgsl */`

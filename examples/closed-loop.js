@@ -33,7 +33,13 @@ export async function init(canvas) {
   device.queue.writeBuffer(positionBuffer, 0, positions);
 
   const drawLines = createGPULines(device, {
-    format,
+    colorTargets: {
+      format,
+      blend: {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+        alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
+      }
+    },
     join: 'round',
     // No cap needed for closed loop
     vertexShaderBody: /* wgsl */`
@@ -56,12 +62,6 @@ export async function init(canvas) {
         return vec4f(1.0, 1.0, 1.0, 0.5);
       }
     `,
-    blend: {
-      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
-    },
-    depthWrite: false,
-    depthCompare: 'always'
   });
 
   const dataBindGroup = device.createBindGroup({

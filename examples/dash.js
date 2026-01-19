@@ -62,8 +62,12 @@ export async function init(canvas) {
   updateBuffers();
 
   const drawLines = createGPULines(device, {
-    format,
-    depthFormat: 'depth24plus',
+    colorTargets: { format },
+    depthStencil: {
+      format: 'depth24plus',
+      depthWriteEnabled: true,
+      depthCompare: 'less',
+    },
     join: 'round',
     cap: 'round',
     vertexShaderBody: /* wgsl */`
@@ -92,8 +96,6 @@ export async function init(canvas) {
         return vec4f(vec3f(v), 1.0);
       }
     `,
-    depthWrite: true,
-    depthCompare: 'less'
   });
 
   const dataBindGroup = device.createBindGroup({

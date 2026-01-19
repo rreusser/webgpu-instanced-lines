@@ -80,6 +80,32 @@ When using `join: 'miter'`, this controls when sharp angles fall back to bevel j
 
 Control the number of triangles used for round joins and caps. Higher values create smoother curves. Default is `8`. Use `maxJoinResolution` and `maxCapResolution` to set upper bounds for runtime adjustment.
 
+### Performance: Vertices Per Instance
+
+The number of vertices processed per instance depends on the join and cap types. Importantly, `maxJoinResolution` only affects vertex count when using `join: 'round'`, and `maxCapResolution` only affects vertex count when using `cap: 'round'`. Non-round join/cap types use fixed, minimal vertex counts regardless of resolution settings.
+
+The formula is: `verticesPerInstance = 2 × (max(capRes2, joinRes2) + 3)`
+
+Where:
+- `joinRes2 = maxJoinResolution × 2` for round joins, or `2` for bevel/miter
+- `capRes2 = maxCapResolution × 2` for round caps, `6` for square caps, or `2` for butt caps
+
+| Join Type | Cap Type | Vertices Per Instance |
+|-----------|----------|----------------------:|
+| bevel | butt | 10 |
+| miter | butt | 10 |
+| bevel | square | 18 |
+| miter | square | 18 |
+| bevel | round | 2 × (maxCapResolution × 2 + 3) |
+| miter | round | 2 × (maxCapResolution × 2 + 3) |
+| round | butt | 2 × (maxJoinResolution × 2 + 3) |
+| round | square | 2 × (maxJoinResolution × 2 + 3) |
+| round | round | 2 × (max(maxJoinResolution, maxCapResolution) × 2 + 3) |
+
+With the default `maxJoinResolution = 16` and `maxCapResolution = 16`, round geometry uses 70 vertices per instance.
+
+**Key takeaway:** If you don't need round joins or caps, you can set `maxJoinResolution` and `maxCapResolution` to any value without affecting performance. Only round geometry uses the resolution settings to determine vertex count.
+
 ### Line Breaks
 
 Insert a point with `w = 0` (or `NaN` for any coordinate) to create a line break. This splits the line into separate segments, each with its own end caps.
