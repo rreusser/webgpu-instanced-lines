@@ -36,7 +36,7 @@ function findTests() {
 // Run a single test in a subprocess
 function runTest(testName, update) {
   return new Promise((resolve) => {
-    const args = [path.join(__dirname, 'run-test.js'), testName];
+    const args = ['--experimental-strip-types', path.join(__dirname, 'run-test.js'), testName];
     if (update) args.push('--update');
 
     const child = spawn('node', args, {
