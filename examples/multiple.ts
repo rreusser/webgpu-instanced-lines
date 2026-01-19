@@ -1,13 +1,13 @@
 // Multiple example: Multiple separate lines with line breaks (NaN/w=0)
 
-import { createGPULines } from '../dist/webgpu-instanced-lines.esm.js';
+import { createGPULines } from '../webgpu-instanced-lines';
 
-export async function init(canvas) {
+export async function init(canvas: HTMLCanvasElement) {
   const adapter = await navigator.gpu?.requestAdapter();
-  const device = await adapter?.requestDevice();
-  if (!device) throw new Error('WebGPU not supported');
+  if (!adapter) throw new Error('WebGPU not supported');
+  const device = await adapter.requestDevice();
 
-  const context = canvas.getContext('webgpu');
+  const context = canvas.getContext('webgpu')!;
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'premultiplied' });
 
@@ -15,7 +15,7 @@ export async function init(canvas) {
   const lineCount = 10;
 
   // Build positions with line breaks (w=0) between each line
-  const points = [];
+  const points: [number, number, number, number][] = [];
 
   // Start with a break to signal a cap
   points.push([NaN, NaN, 0, 0]);

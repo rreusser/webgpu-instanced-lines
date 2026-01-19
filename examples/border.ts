@@ -1,13 +1,13 @@
 // Border example: SDF border effect with mouse interaction
 
-import { createGPULines } from '../dist/webgpu-instanced-lines.esm.js';
+import { createGPULines, JoinType } from '../webgpu-instanced-lines';
 
-export async function init(canvas) {
+export async function init(canvas: HTMLCanvasElement) {
   const adapter = await navigator.gpu?.requestAdapter();
-  const device = await adapter?.requestDevice();
-  if (!device) throw new Error('WebGPU not supported');
+  if (!adapter) throw new Error('WebGPU not supported');
+  const device = await adapter.requestDevice();
 
-  const context = canvas.getContext('webgpu');
+  const context = canvas.getContext('webgpu')!;
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'premultiplied' });
 
@@ -42,7 +42,7 @@ export async function init(canvas) {
   const borderWidth = 10;
   let scale = [1, 1];
 
-  function createDrawLines(join) {
+  function createDrawLines(join: JoinType) {
     return createGPULines(device, {
       colorTargets: { format },
       join,
@@ -122,7 +122,7 @@ export async function init(canvas) {
 
     const props = {
       vertexCount: n,
-      resolution: [canvas.width, canvas.height]
+      resolution: [canvas.width, canvas.height] as [number, number]
     };
 
     // Draw round joins at bottom
@@ -135,7 +135,7 @@ export async function init(canvas) {
     device.queue.submit([encoder.finish()]);
   }
 
-  canvas.addEventListener('mousemove', (e) => {
+  canvas.addEventListener('mousemove', (e: MouseEvent) => {
     scale = [
       e.offsetX / canvas.clientWidth * 2 - 1,
       -e.offsetY / canvas.clientHeight * 2 + 1

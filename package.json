@@ -23,7 +23,8 @@
   "scripts": {
     "build": "npm run lint && npm run test && npm run dist:build && npm run docs:build",
     "clean": "npm run dist:clean && npm run docs:clean",
-    "lint": "eslint webgpu-instanced-lines.ts",
+    "lint": "eslint webgpu-instanced-lines.ts && npm run lint:examples",
+    "lint:examples": "tsc -p tsconfig.examples.json --noEmit",
     "dist:build": "rollup -c build/rollup.config.js",
     "dist:clean": "rm -rf dist",
     "examples:build": "node build/build-examples.js",

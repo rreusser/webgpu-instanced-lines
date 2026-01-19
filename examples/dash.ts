@@ -1,13 +1,13 @@
 // Dash example: Dashing with cumulative distance tracking and mouse interaction
 
-import { createGPULines } from '../dist/webgpu-instanced-lines.esm.js';
+import { createGPULines } from '../webgpu-instanced-lines';
 
-export async function init(canvas) {
+export async function init(canvas: HTMLCanvasElement) {
   const adapter = await navigator.gpu?.requestAdapter();
-  const device = await adapter?.requestDevice();
-  if (!device) throw new Error('WebGPU not supported');
+  if (!adapter) throw new Error('WebGPU not supported');
+  const device = await adapter.requestDevice();
 
-  const context = canvas.getContext('webgpu');
+  const context = canvas.getContext('webgpu')!;
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'premultiplied' });
 
@@ -16,14 +16,14 @@ export async function init(canvas) {
 
   // Construct initial path as a sine wave
   const n = 11;
-  const path = [];
+  const path: [number, number][] = [];
   for (let i = 0; i < n; i++) {
     const t = (i / (n - 1) * 2.0 - 1.0) * 0.8;
     path.push([t, 0.5 * Math.sin(8.0 * t)]);
   }
 
   // Compute cumulative distance for dashing
-  const dist = new Array(n).fill(0);
+  const dist: number[] = new Array(n).fill(0);
   function computeCumulativeDistance() {
     const w = canvas.width;
     const h = canvas.height;
@@ -150,8 +150,8 @@ export async function init(canvas) {
   }
 
   // Mouse interaction: prepend points to path
-  canvas.addEventListener('mousemove', (e) => {
-    const newPoint = [
+  canvas.addEventListener('mousemove', (e: MouseEvent) => {
+    const newPoint: [number, number] = [
       e.offsetX / canvas.clientWidth * 2 - 1,
       -e.offsetY / canvas.clientHeight * 2 + 1
     ];

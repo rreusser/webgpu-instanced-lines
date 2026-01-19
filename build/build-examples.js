@@ -1,19 +1,29 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, readdirSync, rmSync } from 'fs';
 import { join, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
-const examplesDir = join(rootDir, 'examples');
+const examplesDistDir = join(rootDir, 'examples-dist', 'examples');
 const outDir = join(rootDir, '_site');
+
+// Step 1: Compile TypeScript examples
+console.log('Compiling TypeScript examples...');
+try {
+  execSync('npx tsc -p tsconfig.examples.json', { cwd: rootDir, stdio: 'inherit' });
+} catch (error) {
+  console.error('TypeScript compilation failed');
+  process.exit(1);
+}
 
 // Read the main library source (compiled from TypeScript)
 const librarySource = readFileSync(join(rootDir, 'dist/webgpu-instanced-lines.esm.js'), 'utf8');
 
-// Get all example files
-const examples = readdirSync(examplesDir)
+// Get all compiled example files
+const examples = readdirSync(examplesDistDir)
   .filter(f => f.endsWith('.js'))
   .map(f => basename(f, '.js'));
 
@@ -124,12 +134,15 @@ hljs.highlightElement(codeEl);
 
 // Build all examples
 for (const name of examples) {
-  const examplePath = join(examplesDir, `${name}.js`);
+  const examplePath = join(examplesDistDir, `${name}.js`);
   const exampleSource = readFileSync(examplePath, 'utf8');
   const html = generateHTML(name, exampleSource);
   const outputPath = join(outDir, `${name}.html`);
   writeFileSync(outputPath, html);
   console.log(`Built: _site/${name}.html`);
 }
+
+// Clean up compiled examples directory
+rmSync(join(rootDir, 'examples-dist'), { recursive: true, force: true });
 
 console.log(`\nBuilt ${examples.length} examples`);

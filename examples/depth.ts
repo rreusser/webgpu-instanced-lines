@@ -1,13 +1,13 @@
 // Depth example: Animated 3D spirals with depth testing and SDF borders
 
-import { createGPULines } from '../dist/webgpu-instanced-lines.esm.js';
+import { createGPULines } from '../webgpu-instanced-lines';
 
-export async function init(canvas) {
+export async function init(canvas: HTMLCanvasElement) {
   const adapter = await navigator.gpu?.requestAdapter();
-  const device = await adapter?.requestDevice();
-  if (!device) throw new Error('WebGPU not supported');
+  if (!adapter) throw new Error('WebGPU not supported');
+  const device = await adapter.requestDevice();
 
-  const context = canvas.getContext('webgpu');
+  const context = canvas.getContext('webgpu')!;
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'premultiplied' });
 
@@ -152,7 +152,7 @@ export async function init(canvas) {
 
     const props = {
       vertexCount: n,
-      resolution: [canvas.width, canvas.height]
+      resolution: [canvas.width, canvas.height] as [number, number]
     };
 
     // Update uniforms for all spirals before the render pass
@@ -177,8 +177,8 @@ export async function init(canvas) {
   }
 
   // Animation loop
-  let animationId;
-  function animate(time) {
+  let animationId: number;
+  function animate(time: number) {
     render(time);
     animationId = requestAnimationFrame(animate);
   }
