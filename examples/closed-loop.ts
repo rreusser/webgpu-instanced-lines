@@ -1,8 +1,6 @@
 // Closed loop example: Seven-sided star shape
 //
 // For closed loops, use modular arithmetic in getVertex to wrap indices.
-// Pass vertexCount = n + 3 to provide extra indices for proper join computation.
-
 import { createGPULines } from '../webgpu-instanced-lines';
 
 export async function init(canvas: HTMLCanvasElement) {
