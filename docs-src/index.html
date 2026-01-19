@@ -461,12 +461,11 @@
         // Layer 1: Base fill color (debug instance color or normal color)
         var baseColor: vec3f;
         if (debug.enabled == 1u) {
-          let iInstanceID = floor(instanceID + 0.5);
-          if (iInstanceID < 0.0) {
-            baseColor = vec3f(0.8, 0.1, 0.4);  // Red/pink for caps
-          } else {
-            baseColor = select(vec3f(0.8, 0.1, 0.4), vec3f(0.1, 0.7, 1.0), i32(iInstanceID) % 2 == 0);
-          }
+          // instanceID encodes: non-negative = segment index, negative = cap with index (-id - 1)
+          let isCap = instanceID < 0.0;
+          let segmentIndex = select(instanceID, -instanceID - 1.0, isCap);
+          let iSegmentIndex = i32(floor(segmentIndex + 0.5));
+          baseColor = select(vec3f(0.8, 0.1, 0.4), vec3f(0.1, 0.7, 1.0), iSegmentIndex % 2 == 0);
         } else {
           baseColor = vec3f(0.1, 0.7, 1.0);
         }

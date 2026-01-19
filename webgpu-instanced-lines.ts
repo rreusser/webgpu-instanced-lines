@@ -959,9 +959,10 @@ ${varyingInterpolation}
 ${varyingOutputAssign}
 
   // Debug varyings for visualization and wireframe rendering
-  // instanceID: segment index, or negative for cap vertices (helps identify line ends)
+  // instanceID: segment index, or negative (-index - 1) for cap vertices
+  // This encoding preserves alternation while indicating cap status
   // Note: isStartCap and isEndCap were computed before the mirror swap
-  output.instanceID = select(f32(instanceIndex), -0.5, isStartCap || isEndCap);
+  output.instanceID = select(f32(instanceIndex), -f32(instanceIndex) - 1.0, isStartCap || isEndCap);
 
   // triStripCoord: encodes position within the triangle strip
   //   x: which pair of vertices (0, 1, 2, ...)

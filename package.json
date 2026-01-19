@@ -17,13 +17,14 @@
   },
   "files": [
     "dist",
-    "webgpu-instanced-lines.ts"
+    "webgpu-instanced-lines.ts",
+    "*.md"
   ],
   "scripts": {
     "lint": "eslint webgpu-instanced-lines.ts",
+    "dist:build": "rollup -c build/rollup.config.js",
     "dist:clean": "rm -rf dist",
-    "build:all": "npm run lint && npm run test && npm run build && npm run examples:build && npm run docs:build",
-    "build": "rollup -c build/rollup.config.js",
+    "prepublishOnly": "npm run lint && npm run test && npm run build && npm run examples:build && npm run docs:build",
     "examples:build": "node build/build-examples.js",
     "prepublishOnly": "npm run build",
     "test": "node test/run-tests.js",
