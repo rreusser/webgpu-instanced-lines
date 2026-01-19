@@ -6,10 +6,10 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "examples-dist",
-    "rootDir": ".",
+    "outDir": "../examples-dist",
+    "rootDir": "..",
     "types": ["@webgpu/types"]
   },
-  "include": ["examples/*.ts", "webgpu-instanced-lines.ts"],
-  "exclude": ["node_modules"]
+  "include": ["../examples/*.ts", "../webgpu-instanced-lines.ts"],
+  "exclude": ["../node_modules"]
 }

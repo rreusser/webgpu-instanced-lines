@@ -13,7 +13,7 @@ const outDir = join(rootDir, '_site');
 // Step 1: Compile TypeScript examples
 console.log('Compiling TypeScript examples...');
 try {
-  execSync('npx tsc -p tsconfig.examples.json', { cwd: rootDir, stdio: 'inherit' });
+  execSync('npx tsc -p build/tsconfig.examples.json', { cwd: rootDir, stdio: 'inherit' });
 } catch (error) {
   console.error('TypeScript compilation failed');
   process.exit(1);

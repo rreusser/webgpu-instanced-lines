@@ -91,4 +91,4 @@ See the [examples](examples/) directory for working examples. Each demonstrates 
 
 ## License
 
-MIT
+&copy; 2026 Ricky Reusser. MIT License.

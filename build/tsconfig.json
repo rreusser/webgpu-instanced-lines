@@ -7,11 +7,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "declaration": true,
-    "declarationDir": "dist",
-    "outDir": "dist",
-    "rootDir": ".",
+    "declarationDir": "../dist",
+    "outDir": "../dist",
+    "rootDir": "..",
     "types": ["@webgpu/types"]
   },
-  "include": ["webgpu-instanced-lines.ts"],
-  "exclude": ["node_modules", "dist", "docs", "_site", "build", "test", "examples"]
+  "include": ["../webgpu-instanced-lines.ts"],
+  "exclude": ["../node_modules", "../dist", "../docs", "../_site", "../test", "../examples"]
 }

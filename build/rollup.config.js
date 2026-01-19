@@ -2,6 +2,8 @@ import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import minifyWGSL from './rollup-plugin-minify-wgsl.js';
 
+const tsconfig = './build/tsconfig.json';
+
 export default [
   // ESM build (unminified) with declaration files
   {
@@ -11,7 +13,7 @@ export default [
       format: 'esm',
       sourcemap: true
     },
-    plugins: [typescript({ declaration: true, declarationDir: 'dist' })]
+    plugins: [typescript({ tsconfig, declaration: true, declarationDir: 'dist' })]
   },
   // ESM build (minified)
   {
@@ -21,7 +23,7 @@ export default [
       format: 'esm',
       sourcemap: true
     },
-    plugins: [typescript(), minifyWGSL(), terser()]
+    plugins: [typescript({ tsconfig }), minifyWGSL(), terser()]
   },
   // UMD build (minified) for browser <script> tag
   {
@@ -32,6 +34,6 @@ export default [
       name: 'WebGPUInstancedLines',
       sourcemap: true
     },
-    plugins: [typescript(), minifyWGSL(), terser()]
+    plugins: [typescript({ tsconfig }), minifyWGSL(), terser()]
   }
 ];

@@ -7,8 +7,6 @@ test/
 
 # Build configuration
 build/
-tsconfig.json
-eslint.config.js
 
 # Examples
 examples/

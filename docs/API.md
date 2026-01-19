@@ -28,8 +28,8 @@ interface GPULinesOptions {
   miterLimit?: number;         // Miter limit before bevel fallback (default: 4)
   joinResolution?: number;     // Default triangles for round joins (default: 8)
   capResolution?: number;      // Default triangles for round caps (default: 8)
-  maxJoinResolution?: number;  // Max join resolution at runtime (default: 16)
-  maxCapResolution?: number;   // Max cap resolution at runtime (default: 16)
+  maxJoinResolution?: number;  // Max join resolution at runtime (default: 8)
+  maxCapResolution?: number;   // Max cap resolution at runtime (default: 8)
 
   // Shader customization
   vertexFunction?: string;     // Name of vertex function (default: 'getVertex')
@@ -102,7 +102,7 @@ Where:
 | round | square | 2 × (maxJoinResolution × 2 + 3) |
 | round | round | 2 × (max(maxJoinResolution, maxCapResolution) × 2 + 3) |
 
-With the default `maxJoinResolution = 16` and `maxCapResolution = 16`, round geometry uses 70 vertices per instance.
+With the default `maxJoinResolution = 8` and `maxCapResolution = 8`, round geometry uses 38 vertices per instance.
 
 If you don't need round joins or caps, you can set `maxJoinResolution` and `maxCapResolution` to any value without affecting performance. Only round geometry uses the resolution settings to determine vertex count.
 

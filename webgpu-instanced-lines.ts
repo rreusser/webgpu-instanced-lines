@@ -186,10 +186,10 @@ export function createGPULines(device: GPUDevice, options: GPULinesOptions): GPU
     positionField = 'position',
     widthField = 'width',
     join = 'miter',
-    maxJoinResolution = 16,
+    maxJoinResolution = 8,
     miterLimit: defaultMiterLimit = 4,
     cap = 'square',
-    maxCapResolution = 16,
+    maxCapResolution = 8,
   } = options;
 
   // Normalize colorTargets to array

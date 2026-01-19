@@ -1,5 +1,8 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import path from 'path';
+
+const rootDir = path.resolve(import.meta.dirname, '..');
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -9,8 +12,8 @@ export default tseslint.config(
     files: ['**/*.ts'],
     languageOptions: {
       parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        project: path.join(rootDir, 'build/tsconfig.json'),
+        tsconfigRootDir: rootDir,
       },
     },
     rules: {
