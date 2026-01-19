@@ -154,10 +154,8 @@ export async function init(canvas: HTMLCanvasElement) {
       depthWriteEnabled: true,
       depthCompare: 'less',
     },
-    join: 'round',
-    cap: 'round',
-    joinResolution: 1,
-    capResolution: 3,
+    join: 'miter',
+    cap: 'square',
     vertexShaderBody: /* wgsl */`
       @group(1) @binding(0) var<storage, read> state: array<vec4f>;
       @group(1) @binding(1) var<uniform> projViewMatrix: mat4x4f;
@@ -241,6 +239,11 @@ export async function init(canvas: HTMLCanvasElement) {
       }
 
       fn getColor(lineCoord: vec2f, t: f32, velocity: f32) -> vec4f {
+        // Discard outside circular region (round cap from square geometry)
+        if (length(lineCoord) > 1.0) {
+          discard;
+        }
+
         let width = ${(lineWidth * devicePixelRatio).toFixed(1)};
         let borderWidth = 1.0 * ${devicePixelRatio.toFixed(1)};
 
