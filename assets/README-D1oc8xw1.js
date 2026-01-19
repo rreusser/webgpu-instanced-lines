@@ -1,6 +1,6 @@
 const e=`# WebGPU Instanced Lines
 
-![foo](./docs/images/lines.png)
+![lines](https://raw.githubusercontent.com/rreusser/webgpu-instanced-lines/main/docs/images/lines.png)
 
 High-performance, flexible GPU-accelerated line rendering for WebGPU. A direct port of [regl-gpu-lines](https://github.com/rreusser/regl-gpu-lines) to WebGPU.
 
