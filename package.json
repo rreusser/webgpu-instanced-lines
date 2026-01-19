@@ -31,8 +31,9 @@
     "test": "node test/run-tests.js",
     "test:update": "node test/run-tests.js --update",
     "docs:preview": "vite -c build/vite.config.js",
-    "docs:build": "vite build -c build/vite.config.js",
-    "docs:clean": "rm -rf docs"
+    "docs:build": "vite build -c build/vite.config.js && npm run examples:build",
+    "docs:deploy": "npm run docs:build && gh-pages -d _site",
+    "docs:clean": "rm -rf _site"
   },
   "keywords": [
     "webgpu",
@@ -51,6 +52,7 @@
     "@rreusser/mcp-observable-notebookkit-debug": "file:../mcp-observable-notebookkit-debug",
     "@webgpu/types": "^0.1.69",
     "eslint": "^9.39.2",
+    "gh-pages": "^6.3.0",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
     "rollup": "^4.9.0",

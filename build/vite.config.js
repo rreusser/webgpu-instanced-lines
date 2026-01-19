@@ -9,17 +9,17 @@ function copyStaticAssets() {
     name: "copy-static-assets",
     closeBundle() {
       const rootDir = resolve(import.meta.dirname, "..");
-      const outDir = resolve(rootDir, "docs");
+      const outDir = resolve(rootDir, "_site");
 
       // Copy images directory
-      const imagesSource = resolve(rootDir, "docs-src/images");
+      const imagesSource = resolve(rootDir, "docs/images");
       const imagesDest = resolve(outDir, "images");
       if (existsSync(imagesSource)) {
         cpSync(imagesSource, imagesDest, { recursive: true });
       }
 
-      // Copy API.md
-      const apiSource = resolve(rootDir, "docs-src/API.md");
+      // Copy API.md from root
+      const apiSource = resolve(rootDir, "API.md");
       const apiDest = resolve(outDir, "API.md");
       if (existsSync(apiSource)) {
         copyFileSync(apiSource, apiDest);
@@ -31,10 +31,10 @@ function copyStaticAssets() {
 export default defineConfig({
   ...config(),
   plugins: [debugNotebook(), observable(), copyStaticAssets()],
-  root: "docs-src",
+  root: "docs",
   build: {
     target: "esnext",
-    outDir: "../docs",
+    outDir: "../_site",
     emptyOutDir: true,
   },
   optimizeDeps: {

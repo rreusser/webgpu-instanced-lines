@@ -13,5 +13,5 @@
     "types": ["@webgpu/types"]
   },
   "include": ["webgpu-instanced-lines.ts"],
-  "exclude": ["node_modules", "dist", "docs", "docs-src", "build", "test", "examples"]
+  "exclude": ["node_modules", "dist", "docs", "_site", "build", "test", "examples"]
 }

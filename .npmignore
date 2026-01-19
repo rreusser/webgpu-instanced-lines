@@ -1,6 +1,6 @@
 # Documentation
 docs/
-docs-src/
+_site/
 
 # Tests
 test/

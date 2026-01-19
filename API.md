@@ -84,11 +84,84 @@ Control the number of triangles used for round joins and caps. Higher values cre
 
 Insert a point with `w = 0` (or `NaN` for any coordinate) to create a line break. This splits the line into separate segments, each with its own end caps.
 
+## Drawing
+
+### `gpuLines.draw(pass, props, bindGroups?)`
+
+Draws lines in a render pass.
+
+- `pass`: `GPURenderPassEncoder` - The active render pass
+- `props`: `DrawProps` - Draw properties (see type definition above)
+- `bindGroups`: `GPUBindGroup[]` (optional) - User bind groups for groups 1, 2, etc.
+
+### `gpuLines.getBindGroupLayout(index)`
+
+Returns the `GPUBindGroupLayout` for the specified group index. Use this to create bind groups matching the bindings declared in your `vertexShaderBody`.
+
+### `gpuLines.updateUniforms(props)`
+
+Updates internal uniforms without drawing. Useful when recording multiple draw calls in a single render pass. Call with `skipUniformUpdate: true` in subsequent `draw()` calls.
+
+### `gpuLines.destroy()`
+
+Releases GPU resources (pipeline, uniform buffer, bind group).
+
+### Example
+
+```javascript
+// Create bind group matching your shader's @group(1) bindings
+const dataBindGroup = device.createBindGroup({
+  layout: gpuLines.getBindGroupLayout(1),
+  entries: [
+    { binding: 0, resource: { buffer: myPositionBuffer } },
+    { binding: 1, resource: { buffer: myUniformBuffer } }
+    // ... match your vertexShaderBody declarations
+  ]
+});
+
+const pass = encoder.beginRenderPass({ /* ... */ });
+gpuLines.draw(pass, {
+  vertexCount: points.length,
+  resolution: [canvas.width, canvas.height]
+}, [dataBindGroup]);
+pass.end();
+```
+
+
 ## Custom Shaders
 
 The library supports custom WGSL shaders for advanced rendering effects. Provide shader code via the `fragmentShaderBody` and `vertexShaderBody` options.
 
 The library parses your `Vertex` struct to identify the position, width, and varying fields automatically. The library reserves `@group(0)` for its internal uniforms; your shader code should use `@group(1)` and higher for your own data.
+
+### `vertexShaderBody`
+
+The vertex shader body defines how line positions and per-vertex data are computed. You provide bind group declarations (group 1+) for your data, a struct defining the vertex output, and a vertex function that returns the struct given a point index.
+
+The `position` field is a `vec4f` in clip space: `x` and `y` range from -1 to 1, `z` is depth, and `w` must be non-zero for valid points (0 or NaN signals a line break).
+
+```wgsl
+@group(1) @binding(0) var<storage, read> positions: array<vec4f>;
+@group(1) @binding(1) var<uniform> viewMatrix: mat4x4f;
+
+struct Vertex {
+  position: vec4f,  // Clip-space position (w must be non-zero; w=0 or NaN for line breaks)
+  width: f32,       // Line width in pixels
+  // Additional fields become varyings passed to fragment shader
+}
+
+fn getVertex(index: u32) -> Vertex {
+  let p = positions[index];
+  let projected = viewMatrix * vec4f(p.xyz, 1.0);
+  return Vertex(vec4f(projected.xyz, p.w * projected.w), 20.0);
+}
+```
+
+Your `getVertex` function can read from any source (buffers, textures, procedural) and transform to clip space however you like.
+
+Options for customization include `vertexFunction` (name of your vertex function, default `'getVertex'`), `positionField` (name of position field in struct, default `'position'`), and `widthField` (name of width field in struct, default `'width'`).
+
+Available library uniforms are `uniforms.resolution` (canvas resolution in pixels) and `uniforms.pointCount` (number of points).
 
 ### `fragmentShaderBody`
 
@@ -167,77 +240,5 @@ createGPULines(device, {
     }
   }
 });
-```
-
-### `vertexShaderBody`
-
-The vertex shader body defines how line positions and per-vertex data are computed. You provide bind group declarations (group 1+) for your data, a struct defining the vertex output, and a vertex function that returns the struct given a point index.
-
-The `position` field is a `vec4f` in clip space: `x` and `y` range from -1 to 1, `z` is depth, and `w` must be non-zero for valid points (0 or NaN signals a line break).
-
-```wgsl
-@group(1) @binding(0) var<storage, read> positions: array<vec4f>;
-@group(1) @binding(1) var<uniform> viewMatrix: mat4x4f;
-
-struct Vertex {
-  position: vec4f,  // Clip-space position (w must be non-zero; w=0 or NaN for line breaks)
-  width: f32,       // Line width in pixels
-  // Additional fields become varyings passed to fragment shader
-}
-
-fn getVertex(index: u32) -> Vertex {
-  let p = positions[index];
-  let projected = viewMatrix * vec4f(p.xyz, 1.0);
-  return Vertex(vec4f(projected.xyz, p.w * projected.w), 20.0);
-}
-```
-
-Your `getVertex` function can read from any source (buffers, textures, procedural) and transform to clip space however you like.
-
-Options for customization include `vertexFunction` (name of your vertex function, default `'getVertex'`), `positionField` (name of position field in struct, default `'position'`), and `widthField` (name of width field in struct, default `'width'`).
-
-Available library uniforms are `uniforms.resolution` (canvas resolution in pixels) and `uniforms.pointCount` (number of points).
-
-## Drawing
-
-### `gpuLines.draw(pass, props, bindGroups?)`
-
-Draws lines in a render pass.
-
-- `pass`: `GPURenderPassEncoder` - The active render pass
-- `props`: `DrawProps` - Draw properties (see type definition above)
-- `bindGroups`: `GPUBindGroup[]` (optional) - User bind groups for groups 1, 2, etc.
-
-### `gpuLines.getBindGroupLayout(index)`
-
-Returns the `GPUBindGroupLayout` for the specified group index. Use this to create bind groups matching the bindings declared in your `vertexShaderBody`.
-
-### `gpuLines.updateUniforms(props)`
-
-Updates internal uniforms without drawing. Useful when recording multiple draw calls in a single render pass. Call with `skipUniformUpdate: true` in subsequent `draw()` calls.
-
-### `gpuLines.destroy()`
-
-Releases GPU resources (pipeline, uniform buffer, bind group).
-
-### Example
-
-```javascript
-// Create bind group matching your shader's @group(1) bindings
-const dataBindGroup = device.createBindGroup({
-  layout: gpuLines.getBindGroupLayout(1),
-  entries: [
-    { binding: 0, resource: { buffer: myPositionBuffer } },
-    { binding: 1, resource: { buffer: myUniformBuffer } }
-    // ... match your vertexShaderBody declarations
-  ]
-});
-
-const pass = encoder.beginRenderPass({ /* ... */ });
-gpuLines.draw(pass, {
-  vertexCount: points.length,
-  resolution: [canvas.width, canvas.height]
-}, [dataBindGroup]);
-pass.end();
 ```
 

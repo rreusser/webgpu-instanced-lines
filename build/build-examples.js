@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 const examplesDir = join(rootDir, 'examples');
-const docsDir = join(rootDir, 'docs');
+const outDir = join(rootDir, '_site');
 
 // Read the main library source (compiled from TypeScript)
 const librarySource = readFileSync(join(rootDir, 'dist/webgpu-instanced-lines.esm.js'), 'utf8');
@@ -127,9 +127,9 @@ for (const name of examples) {
   const examplePath = join(examplesDir, `${name}.js`);
   const exampleSource = readFileSync(examplePath, 'utf8');
   const html = generateHTML(name, exampleSource);
-  const outputPath = join(docsDir, `${name}.html`);
+  const outputPath = join(outDir, `${name}.html`);
   writeFileSync(outputPath, html);
-  console.log(`Built: docs/${name}.html`);
+  console.log(`Built: _site/${name}.html`);
 }
 
 console.log(`\nBuilt ${examples.length} examples`);
