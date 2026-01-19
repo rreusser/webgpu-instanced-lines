@@ -911,76 +911,67 @@ export { createGPULines };
 
 // Example code
 // Dash example: Dashing with cumulative distance tracking and mouse interaction
-
 export async function init(canvas) {
-  const adapter = await navigator.gpu?.requestAdapter();
-  const device = await adapter?.requestDevice();
-  if (!device) throw new Error('WebGPU not supported');
-
-  const context = canvas.getContext('webgpu');
-  const format = navigator.gpu.getPreferredCanvasFormat();
-  context.configure({ device, format, alphaMode: 'premultiplied' });
-
-  const width = 40;
-  const dashLength = 4;
-
-  // Construct initial path as a sine wave
-  const n = 11;
-  const path = [];
-  for (let i = 0; i < n; i++) {
-    const t = (i / (n - 1) * 2.0 - 1.0) * 0.8;
-    path.push([t, 0.5 * Math.sin(8.0 * t)]);
-  }
-
-  // Compute cumulative distance for dashing
-  const dist = new Array(n).fill(0);
-  function computeCumulativeDistance() {
-    const w = canvas.width;
-    const h = canvas.height;
-    for (let i = 1; i < path.length; i++) {
-      const dx = (path[i][0] - path[i-1][0]) * w * 0.5;
-      const dy = (path[i][1] - path[i-1][1]) * h * 0.5;
-      dist[i] = dist[i-1] + Math.hypot(dx, dy);
+    const adapter = await navigator.gpu?.requestAdapter();
+    if (!adapter)
+        throw new Error('WebGPU not supported');
+    const device = await adapter.requestDevice();
+    const context = canvas.getContext('webgpu');
+    const format = navigator.gpu.getPreferredCanvasFormat();
+    context.configure({ device, format, alphaMode: 'premultiplied' });
+    const width = 40;
+    const dashLength = 4;
+    // Construct initial path as a sine wave
+    const n = 11;
+    const path = [];
+    for (let i = 0; i < n; i++) {
+        const t = (i / (n - 1) * 2.0 - 1.0) * 0.8;
+        path.push([t, 0.5 * Math.sin(8.0 * t)]);
     }
-  }
-  computeCumulativeDistance();
-
-  // Create buffer with position (vec4) and distance (f32) interleaved
-  // Actually, let's use two separate buffers for simplicity
-  const positionBuffer = device.createBuffer({
-    size: n * 16, // vec4f per point
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-
-  const distBuffer = device.createBuffer({
-    size: n * 4, // f32 per point
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-
-  function updateBuffers() {
-    const positions = new Float32Array(n * 4);
-    for (let i = 0; i < path.length; i++) {
-      positions[i * 4 + 0] = path[i][0];
-      positions[i * 4 + 1] = path[i][1];
-      positions[i * 4 + 2] = 0;
-      positions[i * 4 + 3] = 1;
+    // Compute cumulative distance for dashing
+    const dist = new Array(n).fill(0);
+    function computeCumulativeDistance() {
+        const w = canvas.width;
+        const h = canvas.height;
+        for (let i = 1; i < path.length; i++) {
+            const dx = (path[i][0] - path[i - 1][0]) * w * 0.5;
+            const dy = (path[i][1] - path[i - 1][1]) * h * 0.5;
+            dist[i] = dist[i - 1] + Math.hypot(dx, dy);
+        }
     }
-    device.queue.writeBuffer(positionBuffer, 0, positions);
-    device.queue.writeBuffer(distBuffer, 0, new Float32Array(dist));
-  }
-
-  updateBuffers();
-
-  const drawLines = createGPULines(device, {
-    colorTargets: { format },
-    depthStencil: {
-      format: 'depth24plus',
-      depthWriteEnabled: true,
-      depthCompare: 'less',
-    },
-    join: 'round',
-    cap: 'round',
-    vertexShaderBody: /* wgsl */`
+    computeCumulativeDistance();
+    // Create buffer with position (vec4) and distance (f32) interleaved
+    // Actually, let's use two separate buffers for simplicity
+    const positionBuffer = device.createBuffer({
+        size: n * 16, // vec4f per point
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    });
+    const distBuffer = device.createBuffer({
+        size: n * 4, // f32 per point
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    });
+    function updateBuffers() {
+        const positions = new Float32Array(n * 4);
+        for (let i = 0; i < path.length; i++) {
+            positions[i * 4 + 0] = path[i][0];
+            positions[i * 4 + 1] = path[i][1];
+            positions[i * 4 + 2] = 0;
+            positions[i * 4 + 3] = 1;
+        }
+        device.queue.writeBuffer(positionBuffer, 0, positions);
+        device.queue.writeBuffer(distBuffer, 0, new Float32Array(dist));
+    }
+    updateBuffers();
+    const drawLines = createGPULines(device, {
+        colorTargets: { format },
+        depthStencil: {
+            format: 'depth24plus',
+            depthWriteEnabled: true,
+            depthCompare: 'less',
+        },
+        join: 'round',
+        cap: 'round',
+        vertexShaderBody: /* wgsl */ `
       @group(1) @binding(0) var<storage, read> positions: array<vec4f>;
       @group(1) @binding(1) var<storage, read> distances: array<f32>;
 
@@ -994,7 +985,7 @@ export async function init(canvas) {
         return Vertex(positions[index], ${(width * devicePixelRatio).toFixed(1)}, distances[index]);
       }
     `,
-    fragmentShaderBody: /* wgsl */`
+        fragmentShaderBody: /* wgsl */ `
       fn linearstep(a: f32, b: f32, x: f32) -> f32 {
         return clamp((x - a) / (b - a), 0.0, 1.0);
       }
@@ -1006,92 +997,76 @@ export async function init(canvas) {
         return vec4f(vec3f(v), 1.0);
       }
     `,
-  });
-
-  const dataBindGroup = device.createBindGroup({
-    layout: drawLines.getBindGroupLayout(1),
-    entries: [
-      { binding: 0, resource: { buffer: positionBuffer } },
-      { binding: 1, resource: { buffer: distBuffer } }
-    ]
-  });
-
-  // Create depth texture
-  let depthTexture = device.createTexture({
-    size: [canvas.width, canvas.height],
-    format: 'depth24plus',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT
-  });
-
-  function render() {
-    // Recreate depth texture if canvas size changed
-    if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {
-      depthTexture.destroy();
-      depthTexture = device.createTexture({
+    });
+    const dataBindGroup = device.createBindGroup({
+        layout: drawLines.getBindGroupLayout(1),
+        entries: [
+            { binding: 0, resource: { buffer: positionBuffer } },
+            { binding: 1, resource: { buffer: distBuffer } }
+        ]
+    });
+    // Create depth texture
+    let depthTexture = device.createTexture({
         size: [canvas.width, canvas.height],
         format: 'depth24plus',
         usage: GPUTextureUsage.RENDER_ATTACHMENT
-      });
-    }
-
-    const encoder = device.createCommandEncoder();
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [{
-        view: context.getCurrentTexture().createView(),
-        clearValue: [0.2, 0.2, 0.2, 1],
-        loadOp: 'clear',
-        storeOp: 'store'
-      }],
-      depthStencilAttachment: {
-        view: depthTexture.createView(),
-        depthClearValue: 1.0,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store'
-      }
     });
-
-    drawLines.draw(pass, {
-      vertexCount: path.length,
-      resolution: [canvas.width, canvas.height]
-    }, [dataBindGroup]);
-
-    pass.end();
-    device.queue.submit([encoder.finish()]);
-  }
-
-  // Mouse interaction: prepend points to path
-  canvas.addEventListener('mousemove', (e) => {
-    const newPoint = [
-      e.offsetX / canvas.clientWidth * 2 - 1,
-      -e.offsetY / canvas.clientHeight * 2 + 1
-    ];
-
-    const lastPoint = path[0];
-    const newDist = Math.hypot(
-      canvas.clientWidth * (lastPoint[0] - newPoint[0]),
-      canvas.clientHeight * (lastPoint[1] - newPoint[1])
-    );
-
-    if (newDist < Math.max(2, width * 0.5)) return;
-
-    path.unshift(newPoint);
-    dist.unshift(dist[0] - newDist);
-
-    path.pop();
-    dist.pop();
-
-    updateBuffers();
+    function render() {
+        // Recreate depth texture if canvas size changed
+        if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {
+            depthTexture.destroy();
+            depthTexture = device.createTexture({
+                size: [canvas.width, canvas.height],
+                format: 'depth24plus',
+                usage: GPUTextureUsage.RENDER_ATTACHMENT
+            });
+        }
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+                    view: context.getCurrentTexture().createView(),
+                    clearValue: [0.2, 0.2, 0.2, 1],
+                    loadOp: 'clear',
+                    storeOp: 'store'
+                }],
+            depthStencilAttachment: {
+                view: depthTexture.createView(),
+                depthClearValue: 1.0,
+                depthLoadOp: 'clear',
+                depthStoreOp: 'store'
+            }
+        });
+        drawLines.draw(pass, {
+            vertexCount: path.length,
+            resolution: [canvas.width, canvas.height]
+        }, [dataBindGroup]);
+        pass.end();
+        device.queue.submit([encoder.finish()]);
+    }
+    // Mouse interaction: prepend points to path
+    canvas.addEventListener('mousemove', (e) => {
+        const newPoint = [
+            e.offsetX / canvas.clientWidth * 2 - 1,
+            -e.offsetY / canvas.clientHeight * 2 + 1
+        ];
+        const lastPoint = path[0];
+        const newDist = Math.hypot(canvas.clientWidth * (lastPoint[0] - newPoint[0]), canvas.clientHeight * (lastPoint[1] - newPoint[1]));
+        if (newDist < Math.max(2, width * 0.5))
+            return;
+        path.unshift(newPoint);
+        dist.unshift(dist[0] - newDist);
+        path.pop();
+        dist.pop();
+        updateBuffers();
+        render();
+    });
     render();
-  });
-
-  render();
-  window.addEventListener('resize', () => {
-    computeCumulativeDistance();
-    updateBuffers();
-    render();
-  });
-
-  return { render, destroy: () => drawLines.destroy() };
+    window.addEventListener('resize', () => {
+        computeCumulativeDistance();
+        updateBuffers();
+        render();
+    });
+    return { render, destroy: () => drawLines.destroy() };
 }
 
 // Initialize
@@ -1113,7 +1088,7 @@ init(canvas).catch(err => {
 
 // Syntax highlighting
 const codeEl = document.getElementById('code');
-codeEl.textContent = "// Dash example: Dashing with cumulative distance tracking and mouse interaction\n\nexport async function init(canvas) {\n  const adapter = await navigator.gpu?.requestAdapter();\n  const device = await adapter?.requestDevice();\n  if (!device) throw new Error('WebGPU not supported');\n\n  const context = canvas.getContext('webgpu');\n  const format = navigator.gpu.getPreferredCanvasFormat();\n  context.configure({ device, format, alphaMode: 'premultiplied' });\n\n  const width = 40;\n  const dashLength = 4;\n\n  // Construct initial path as a sine wave\n  const n = 11;\n  const path = [];\n  for (let i = 0; i < n; i++) {\n    const t = (i / (n - 1) * 2.0 - 1.0) * 0.8;\n    path.push([t, 0.5 * Math.sin(8.0 * t)]);\n  }\n\n  // Compute cumulative distance for dashing\n  const dist = new Array(n).fill(0);\n  function computeCumulativeDistance() {\n    const w = canvas.width;\n    const h = canvas.height;\n    for (let i = 1; i < path.length; i++) {\n      const dx = (path[i][0] - path[i-1][0]) * w * 0.5;\n      const dy = (path[i][1] - path[i-1][1]) * h * 0.5;\n      dist[i] = dist[i-1] + Math.hypot(dx, dy);\n    }\n  }\n  computeCumulativeDistance();\n\n  // Create buffer with position (vec4) and distance (f32) interleaved\n  // Actually, let's use two separate buffers for simplicity\n  const positionBuffer = device.createBuffer({\n    size: n * 16, // vec4f per point\n    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n  });\n\n  const distBuffer = device.createBuffer({\n    size: n * 4, // f32 per point\n    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n  });\n\n  function updateBuffers() {\n    const positions = new Float32Array(n * 4);\n    for (let i = 0; i < path.length; i++) {\n      positions[i * 4 + 0] = path[i][0];\n      positions[i * 4 + 1] = path[i][1];\n      positions[i * 4 + 2] = 0;\n      positions[i * 4 + 3] = 1;\n    }\n    device.queue.writeBuffer(positionBuffer, 0, positions);\n    device.queue.writeBuffer(distBuffer, 0, new Float32Array(dist));\n  }\n\n  updateBuffers();\n\n  const drawLines = createGPULines(device, {\n    colorTargets: { format },\n    depthStencil: {\n      format: 'depth24plus',\n      depthWriteEnabled: true,\n      depthCompare: 'less',\n    },\n    join: 'round',\n    cap: 'round',\n    vertexShaderBody: /* wgsl */`\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n      @group(1) @binding(1) var<storage, read> distances: array<f32>;\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n        dist: f32,\n      }\n\n      fn getVertex(index: u32) -> Vertex {\n        return Vertex(positions[index], ${(width * devicePixelRatio).toFixed(1)}, distances[index]);\n      }\n    `,\n    fragmentShaderBody: /* wgsl */`\n      fn linearstep(a: f32, b: f32, x: f32) -> f32 {\n        return clamp((x - a) / (b - a), 0.0, 1.0);\n      }\n\n      fn getColor(lineCoord: vec2f, dist: f32) -> vec4f {\n        let dashLength = ${(dashLength * width * 2 * devicePixelRatio).toFixed(1)};\n        let dashvar = fract(dist / dashLength) * dashLength;\n        let v = linearstep(0.0, 1.0, dashvar) * linearstep(dashLength * 0.5 + 1.0, dashLength * 0.5, dashvar);\n        return vec4f(vec3f(v), 1.0);\n      }\n    `,\n  });\n\n  const dataBindGroup = device.createBindGroup({\n    layout: drawLines.getBindGroupLayout(1),\n    entries: [\n      { binding: 0, resource: { buffer: positionBuffer } },\n      { binding: 1, resource: { buffer: distBuffer } }\n    ]\n  });\n\n  // Create depth texture\n  let depthTexture = device.createTexture({\n    size: [canvas.width, canvas.height],\n    format: 'depth24plus',\n    usage: GPUTextureUsage.RENDER_ATTACHMENT\n  });\n\n  function render() {\n    // Recreate depth texture if canvas size changed\n    if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {\n      depthTexture.destroy();\n      depthTexture = device.createTexture({\n        size: [canvas.width, canvas.height],\n        format: 'depth24plus',\n        usage: GPUTextureUsage.RENDER_ATTACHMENT\n      });\n    }\n\n    const encoder = device.createCommandEncoder();\n    const pass = encoder.beginRenderPass({\n      colorAttachments: [{\n        view: context.getCurrentTexture().createView(),\n        clearValue: [0.2, 0.2, 0.2, 1],\n        loadOp: 'clear',\n        storeOp: 'store'\n      }],\n      depthStencilAttachment: {\n        view: depthTexture.createView(),\n        depthClearValue: 1.0,\n        depthLoadOp: 'clear',\n        depthStoreOp: 'store'\n      }\n    });\n\n    drawLines.draw(pass, {\n      vertexCount: path.length,\n      resolution: [canvas.width, canvas.height]\n    }, [dataBindGroup]);\n\n    pass.end();\n    device.queue.submit([encoder.finish()]);\n  }\n\n  // Mouse interaction: prepend points to path\n  canvas.addEventListener('mousemove', (e) => {\n    const newPoint = [\n      e.offsetX / canvas.clientWidth * 2 - 1,\n      -e.offsetY / canvas.clientHeight * 2 + 1\n    ];\n\n    const lastPoint = path[0];\n    const newDist = Math.hypot(\n      canvas.clientWidth * (lastPoint[0] - newPoint[0]),\n      canvas.clientHeight * (lastPoint[1] - newPoint[1])\n    );\n\n    if (newDist < Math.max(2, width * 0.5)) return;\n\n    path.unshift(newPoint);\n    dist.unshift(dist[0] - newDist);\n\n    path.pop();\n    dist.pop();\n\n    updateBuffers();\n    render();\n  });\n\n  render();\n  window.addEventListener('resize', () => {\n    computeCumulativeDistance();\n    updateBuffers();\n    render();\n  });\n\n  return { render, destroy: () => drawLines.destroy() };\n}";
+codeEl.textContent = "// Dash example: Dashing with cumulative distance tracking and mouse interaction\nexport async function init(canvas) {\n    const adapter = await navigator.gpu?.requestAdapter();\n    if (!adapter)\n        throw new Error('WebGPU not supported');\n    const device = await adapter.requestDevice();\n    const context = canvas.getContext('webgpu');\n    const format = navigator.gpu.getPreferredCanvasFormat();\n    context.configure({ device, format, alphaMode: 'premultiplied' });\n    const width = 40;\n    const dashLength = 4;\n    // Construct initial path as a sine wave\n    const n = 11;\n    const path = [];\n    for (let i = 0; i < n; i++) {\n        const t = (i / (n - 1) * 2.0 - 1.0) * 0.8;\n        path.push([t, 0.5 * Math.sin(8.0 * t)]);\n    }\n    // Compute cumulative distance for dashing\n    const dist = new Array(n).fill(0);\n    function computeCumulativeDistance() {\n        const w = canvas.width;\n        const h = canvas.height;\n        for (let i = 1; i < path.length; i++) {\n            const dx = (path[i][0] - path[i - 1][0]) * w * 0.5;\n            const dy = (path[i][1] - path[i - 1][1]) * h * 0.5;\n            dist[i] = dist[i - 1] + Math.hypot(dx, dy);\n        }\n    }\n    computeCumulativeDistance();\n    // Create buffer with position (vec4) and distance (f32) interleaved\n    // Actually, let's use two separate buffers for simplicity\n    const positionBuffer = device.createBuffer({\n        size: n * 16, // vec4f per point\n        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n    });\n    const distBuffer = device.createBuffer({\n        size: n * 4, // f32 per point\n        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n    });\n    function updateBuffers() {\n        const positions = new Float32Array(n * 4);\n        for (let i = 0; i < path.length; i++) {\n            positions[i * 4 + 0] = path[i][0];\n            positions[i * 4 + 1] = path[i][1];\n            positions[i * 4 + 2] = 0;\n            positions[i * 4 + 3] = 1;\n        }\n        device.queue.writeBuffer(positionBuffer, 0, positions);\n        device.queue.writeBuffer(distBuffer, 0, new Float32Array(dist));\n    }\n    updateBuffers();\n    const drawLines = createGPULines(device, {\n        colorTargets: { format },\n        depthStencil: {\n            format: 'depth24plus',\n            depthWriteEnabled: true,\n            depthCompare: 'less',\n        },\n        join: 'round',\n        cap: 'round',\n        vertexShaderBody: /* wgsl */ `\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n      @group(1) @binding(1) var<storage, read> distances: array<f32>;\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n        dist: f32,\n      }\n\n      fn getVertex(index: u32) -> Vertex {\n        return Vertex(positions[index], ${(width * devicePixelRatio).toFixed(1)}, distances[index]);\n      }\n    `,\n        fragmentShaderBody: /* wgsl */ `\n      fn linearstep(a: f32, b: f32, x: f32) -> f32 {\n        return clamp((x - a) / (b - a), 0.0, 1.0);\n      }\n\n      fn getColor(lineCoord: vec2f, dist: f32) -> vec4f {\n        let dashLength = ${(dashLength * width * 2 * devicePixelRatio).toFixed(1)};\n        let dashvar = fract(dist / dashLength) * dashLength;\n        let v = linearstep(0.0, 1.0, dashvar) * linearstep(dashLength * 0.5 + 1.0, dashLength * 0.5, dashvar);\n        return vec4f(vec3f(v), 1.0);\n      }\n    `,\n    });\n    const dataBindGroup = device.createBindGroup({\n        layout: drawLines.getBindGroupLayout(1),\n        entries: [\n            { binding: 0, resource: { buffer: positionBuffer } },\n            { binding: 1, resource: { buffer: distBuffer } }\n        ]\n    });\n    // Create depth texture\n    let depthTexture = device.createTexture({\n        size: [canvas.width, canvas.height],\n        format: 'depth24plus',\n        usage: GPUTextureUsage.RENDER_ATTACHMENT\n    });\n    function render() {\n        // Recreate depth texture if canvas size changed\n        if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {\n            depthTexture.destroy();\n            depthTexture = device.createTexture({\n                size: [canvas.width, canvas.height],\n                format: 'depth24plus',\n                usage: GPUTextureUsage.RENDER_ATTACHMENT\n            });\n        }\n        const encoder = device.createCommandEncoder();\n        const pass = encoder.beginRenderPass({\n            colorAttachments: [{\n                    view: context.getCurrentTexture().createView(),\n                    clearValue: [0.2, 0.2, 0.2, 1],\n                    loadOp: 'clear',\n                    storeOp: 'store'\n                }],\n            depthStencilAttachment: {\n                view: depthTexture.createView(),\n                depthClearValue: 1.0,\n                depthLoadOp: 'clear',\n                depthStoreOp: 'store'\n            }\n        });\n        drawLines.draw(pass, {\n            vertexCount: path.length,\n            resolution: [canvas.width, canvas.height]\n        }, [dataBindGroup]);\n        pass.end();\n        device.queue.submit([encoder.finish()]);\n    }\n    // Mouse interaction: prepend points to path\n    canvas.addEventListener('mousemove', (e) => {\n        const newPoint = [\n            e.offsetX / canvas.clientWidth * 2 - 1,\n            -e.offsetY / canvas.clientHeight * 2 + 1\n        ];\n        const lastPoint = path[0];\n        const newDist = Math.hypot(canvas.clientWidth * (lastPoint[0] - newPoint[0]), canvas.clientHeight * (lastPoint[1] - newPoint[1]));\n        if (newDist < Math.max(2, width * 0.5))\n            return;\n        path.unshift(newPoint);\n        dist.unshift(dist[0] - newDist);\n        path.pop();\n        dist.pop();\n        updateBuffers();\n        render();\n    });\n    render();\n    window.addEventListener('resize', () => {\n        computeCumulativeDistance();\n        updateBuffers();\n        render();\n    });\n    return { render, destroy: () => drawLines.destroy() };\n}";
 hljs.highlightElement(codeEl);
 </script>
 </body>

@@ -911,53 +911,47 @@ export { createGPULines };
 
 // Example code
 // Depth example: Animated 3D spirals with depth testing and SDF borders
-
 export async function init(canvas) {
-  const adapter = await navigator.gpu?.requestAdapter();
-  const device = await adapter?.requestDevice();
-  if (!device) throw new Error('WebGPU not supported');
-
-  const context = canvas.getContext('webgpu');
-  const format = navigator.gpu.getPreferredCanvasFormat();
-  context.configure({ device, format, alphaMode: 'premultiplied' });
-
-  const n = 101;
-  const width = 30;
-  const borderWidth = 5;
-
-  // Create positions buffer (just x values from 0 to 1)
-  const positions = new Float32Array(n * 4);
-  for (let i = 0; i < n; i++) {
-    const x = i / (n - 1);
-    positions[i * 4 + 0] = x;
-    positions[i * 4 + 1] = 0;
-    positions[i * 4 + 2] = 0;
-    positions[i * 4 + 3] = 1;
-  }
-
-  const positionBuffer = device.createBuffer({
-    size: positions.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-  device.queue.writeBuffer(positionBuffer, 0, positions);
-
-  // Uniform buffers for each spiral (one per spiral to avoid race conditions)
-  const uniformBuffers = [0, 1, 2].map(() => device.createBuffer({
-    size: 32, // time, phase, color (vec3), padding
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-  }));
-
-  const drawLines = createGPULines(device, {
-    colorTargets: { format },
-    depthStencil: {
-      format: 'depth24plus',
-      depthWriteEnabled: true,
-      depthCompare: 'less',
-    },
-    join: 'round',
-    cap: 'round',
-    joinResolution: 1,
-    vertexShaderBody: /* wgsl */`
+    const adapter = await navigator.gpu?.requestAdapter();
+    if (!adapter)
+        throw new Error('WebGPU not supported');
+    const device = await adapter.requestDevice();
+    const context = canvas.getContext('webgpu');
+    const format = navigator.gpu.getPreferredCanvasFormat();
+    context.configure({ device, format, alphaMode: 'premultiplied' });
+    const n = 101;
+    const width = 30;
+    const borderWidth = 5;
+    // Create positions buffer (just x values from 0 to 1)
+    const positions = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
+        const x = i / (n - 1);
+        positions[i * 4 + 0] = x;
+        positions[i * 4 + 1] = 0;
+        positions[i * 4 + 2] = 0;
+        positions[i * 4 + 3] = 1;
+    }
+    const positionBuffer = device.createBuffer({
+        size: positions.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    });
+    device.queue.writeBuffer(positionBuffer, 0, positions);
+    // Uniform buffers for each spiral (one per spiral to avoid race conditions)
+    const uniformBuffers = [0, 1, 2].map(() => device.createBuffer({
+        size: 32, // time, phase, color (vec3), padding
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    }));
+    const drawLines = createGPULines(device, {
+        colorTargets: { format },
+        depthStencil: {
+            format: 'depth24plus',
+            depthWriteEnabled: true,
+            depthCompare: 'less',
+        },
+        join: 'round',
+        cap: 'round',
+        joinResolution: 1,
+        vertexShaderBody: /* wgsl */ `
       @group(1) @binding(0) var<storage, read> positions: array<vec4f>;
       @group(1) @binding(1) var<uniform> params: Params;
 
@@ -985,7 +979,7 @@ export async function init(canvas) {
         return Vertex(pos, ${(width * devicePixelRatio).toFixed(1)});
       }
     `,
-    fragmentShaderBody: /* wgsl */`
+        fragmentShaderBody: /* wgsl */ `
       @group(1) @binding(1) var<uniform> params: Params;
 
       struct Params {
@@ -1006,101 +1000,88 @@ export async function init(canvas) {
         return vec4f(color, 1.0);
       }
     `,
-  });
-
-  // Create bind groups for each spiral
-  const dataBindGroups = uniformBuffers.map(uniformBuffer =>
-    device.createBindGroup({
-      layout: drawLines.getBindGroupLayout(1),
-      entries: [
-        { binding: 0, resource: { buffer: positionBuffer } },
-        { binding: 1, resource: { buffer: uniformBuffer } }
-      ]
-    })
-  );
-
-  // Create depth texture
-  let depthTexture = device.createTexture({
-    size: [canvas.width, canvas.height],
-    format: 'depth24plus',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT
-  });
-
-  const colors = [
-    [0.5, 1.0, 0.0],
-    [0.0, 0.5, 1.0],
-    [1.0, 0.0, 0.5]
-  ];
-  const phases = [0, Math.PI * 2 / 3, Math.PI * 4 / 3];
-
-  function render(time = 0) {
-    // Recreate depth texture if canvas size changed
-    if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {
-      depthTexture.destroy();
-      depthTexture = device.createTexture({
+    });
+    // Create bind groups for each spiral
+    const dataBindGroups = uniformBuffers.map(uniformBuffer => device.createBindGroup({
+        layout: drawLines.getBindGroupLayout(1),
+        entries: [
+            { binding: 0, resource: { buffer: positionBuffer } },
+            { binding: 1, resource: { buffer: uniformBuffer } }
+        ]
+    }));
+    // Create depth texture
+    let depthTexture = device.createTexture({
         size: [canvas.width, canvas.height],
         format: 'depth24plus',
         usage: GPUTextureUsage.RENDER_ATTACHMENT
-      });
-    }
-
-    const encoder = device.createCommandEncoder();
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [{
-        view: context.getCurrentTexture().createView(),
-        clearValue: [0.2, 0.2, 0.2, 1],
-        loadOp: 'clear',
-        storeOp: 'store'
-      }],
-      depthStencilAttachment: {
-        view: depthTexture.createView(),
-        depthClearValue: 1.0,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store'
-      }
     });
-
-    const props = {
-      vertexCount: n,
-      resolution: [canvas.width, canvas.height]
+    const colors = [
+        [0.5, 1.0, 0.0],
+        [0.0, 0.5, 1.0],
+        [1.0, 0.0, 0.5]
+    ];
+    const phases = [0, Math.PI * 2 / 3, Math.PI * 4 / 3];
+    function render(time = 0) {
+        // Recreate depth texture if canvas size changed
+        if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {
+            depthTexture.destroy();
+            depthTexture = device.createTexture({
+                size: [canvas.width, canvas.height],
+                format: 'depth24plus',
+                usage: GPUTextureUsage.RENDER_ATTACHMENT
+            });
+        }
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+                    view: context.getCurrentTexture().createView(),
+                    clearValue: [0.2, 0.2, 0.2, 1],
+                    loadOp: 'clear',
+                    storeOp: 'store'
+                }],
+            depthStencilAttachment: {
+                view: depthTexture.createView(),
+                depthClearValue: 1.0,
+                depthLoadOp: 'clear',
+                depthStoreOp: 'store'
+            }
+        });
+        const props = {
+            vertexCount: n,
+            resolution: [canvas.width, canvas.height]
+        };
+        // Update uniforms for all spirals before the render pass
+        for (let i = 0; i < 3; i++) {
+            const uniforms = new Float32Array([
+                time * 0.001, // time
+                phases[i], // phase
+                0, 0, // padding
+                ...colors[i], // color
+                0 // padding
+            ]);
+            device.queue.writeBuffer(uniformBuffers[i], 0, uniforms);
+        }
+        // Draw three spirals with different phases and colors
+        for (let i = 0; i < 3; i++) {
+            drawLines.draw(pass, props, [dataBindGroups[i]]);
+        }
+        pass.end();
+        device.queue.submit([encoder.finish()]);
+    }
+    // Animation loop
+    let animationId;
+    function animate(time) {
+        render(time);
+        animationId = requestAnimationFrame(animate);
+    }
+    animate(0);
+    return {
+        render,
+        destroy: () => {
+            cancelAnimationFrame(animationId);
+            drawLines.destroy();
+        }
     };
-
-    // Update uniforms for all spirals before the render pass
-    for (let i = 0; i < 3; i++) {
-      const uniforms = new Float32Array([
-        time * 0.001, // time
-        phases[i],    // phase
-        0, 0,         // padding
-        ...colors[i], // color
-        0             // padding
-      ]);
-      device.queue.writeBuffer(uniformBuffers[i], 0, uniforms);
-    }
-
-    // Draw three spirals with different phases and colors
-    for (let i = 0; i < 3; i++) {
-      drawLines.draw(pass, props, [dataBindGroups[i]]);
-    }
-
-    pass.end();
-    device.queue.submit([encoder.finish()]);
-  }
-
-  // Animation loop
-  let animationId;
-  function animate(time) {
-    render(time);
-    animationId = requestAnimationFrame(animate);
-  }
-  animate(0);
-
-  return {
-    render,
-    destroy: () => {
-      cancelAnimationFrame(animationId);
-      drawLines.destroy();
-    }
-  };
 }
 
 // Initialize
@@ -1122,7 +1103,7 @@ init(canvas).catch(err => {
 
 // Syntax highlighting
 const codeEl = document.getElementById('code');
-codeEl.textContent = "// Depth example: Animated 3D spirals with depth testing and SDF borders\n\nexport async function init(canvas) {\n  const adapter = await navigator.gpu?.requestAdapter();\n  const device = await adapter?.requestDevice();\n  if (!device) throw new Error('WebGPU not supported');\n\n  const context = canvas.getContext('webgpu');\n  const format = navigator.gpu.getPreferredCanvasFormat();\n  context.configure({ device, format, alphaMode: 'premultiplied' });\n\n  const n = 101;\n  const width = 30;\n  const borderWidth = 5;\n\n  // Create positions buffer (just x values from 0 to 1)\n  const positions = new Float32Array(n * 4);\n  for (let i = 0; i < n; i++) {\n    const x = i / (n - 1);\n    positions[i * 4 + 0] = x;\n    positions[i * 4 + 1] = 0;\n    positions[i * 4 + 2] = 0;\n    positions[i * 4 + 3] = 1;\n  }\n\n  const positionBuffer = device.createBuffer({\n    size: positions.byteLength,\n    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n  });\n  device.queue.writeBuffer(positionBuffer, 0, positions);\n\n  // Uniform buffers for each spiral (one per spiral to avoid race conditions)\n  const uniformBuffers = [0, 1, 2].map(() => device.createBuffer({\n    size: 32, // time, phase, color (vec3), padding\n    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST\n  }));\n\n  const drawLines = createGPULines(device, {\n    colorTargets: { format },\n    depthStencil: {\n      format: 'depth24plus',\n      depthWriteEnabled: true,\n      depthCompare: 'less',\n    },\n    join: 'round',\n    cap: 'round',\n    joinResolution: 1,\n    vertexShaderBody: /* wgsl */`\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n      @group(1) @binding(1) var<uniform> params: Params;\n\n      struct Params {\n        time: f32,\n        phase: f32,\n        color: vec3f,\n      }\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n      }\n\n      fn getVertex(index: u32) -> Vertex {\n        let p = positions[index];\n        let x = p.x;\n        let theta = 3.141 * (6.0 * x + params.time) - params.phase;\n        let pos = vec4f(\n          0.5 * cos(theta),\n          0.5 * (x * 2.0 - 1.0) * 1.5,\n          0.25 + 0.25 * sin(theta),  // WebGPU clip z is [0,1], not [-1,1]\n          1.0\n        );\n        return Vertex(pos, ${(width * devicePixelRatio).toFixed(1)});\n      }\n    `,\n    fragmentShaderBody: /* wgsl */`\n      @group(1) @binding(1) var<uniform> params: Params;\n\n      struct Params {\n        time: f32,\n        phase: f32,\n        color: vec3f,\n      }\n\n      fn getColor(lineCoord: vec2f) -> vec4f {\n        let width = ${(width * devicePixelRatio).toFixed(1)};\n        let borderWidth = ${(borderWidth * devicePixelRatio).toFixed(1)};\n\n        // Convert the line coord into an SDF\n        let sdf = length(lineCoord) * width;\n\n        // Apply a border with smooth transition\n        let color = mix(params.color, vec3f(1.0), smoothstep(width - borderWidth - 0.5, width - borderWidth + 0.5, sdf));\n        return vec4f(color, 1.0);\n      }\n    `,\n  });\n\n  // Create bind groups for each spiral\n  const dataBindGroups = uniformBuffers.map(uniformBuffer =>\n    device.createBindGroup({\n      layout: drawLines.getBindGroupLayout(1),\n      entries: [\n        { binding: 0, resource: { buffer: positionBuffer } },\n        { binding: 1, resource: { buffer: uniformBuffer } }\n      ]\n    })\n  );\n\n  // Create depth texture\n  let depthTexture = device.createTexture({\n    size: [canvas.width, canvas.height],\n    format: 'depth24plus',\n    usage: GPUTextureUsage.RENDER_ATTACHMENT\n  });\n\n  const colors = [\n    [0.5, 1.0, 0.0],\n    [0.0, 0.5, 1.0],\n    [1.0, 0.0, 0.5]\n  ];\n  const phases = [0, Math.PI * 2 / 3, Math.PI * 4 / 3];\n\n  function render(time = 0) {\n    // Recreate depth texture if canvas size changed\n    if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {\n      depthTexture.destroy();\n      depthTexture = device.createTexture({\n        size: [canvas.width, canvas.height],\n        format: 'depth24plus',\n        usage: GPUTextureUsage.RENDER_ATTACHMENT\n      });\n    }\n\n    const encoder = device.createCommandEncoder();\n    const pass = encoder.beginRenderPass({\n      colorAttachments: [{\n        view: context.getCurrentTexture().createView(),\n        clearValue: [0.2, 0.2, 0.2, 1],\n        loadOp: 'clear',\n        storeOp: 'store'\n      }],\n      depthStencilAttachment: {\n        view: depthTexture.createView(),\n        depthClearValue: 1.0,\n        depthLoadOp: 'clear',\n        depthStoreOp: 'store'\n      }\n    });\n\n    const props = {\n      vertexCount: n,\n      resolution: [canvas.width, canvas.height]\n    };\n\n    // Update uniforms for all spirals before the render pass\n    for (let i = 0; i < 3; i++) {\n      const uniforms = new Float32Array([\n        time * 0.001, // time\n        phases[i],    // phase\n        0, 0,         // padding\n        ...colors[i], // color\n        0             // padding\n      ]);\n      device.queue.writeBuffer(uniformBuffers[i], 0, uniforms);\n    }\n\n    // Draw three spirals with different phases and colors\n    for (let i = 0; i < 3; i++) {\n      drawLines.draw(pass, props, [dataBindGroups[i]]);\n    }\n\n    pass.end();\n    device.queue.submit([encoder.finish()]);\n  }\n\n  // Animation loop\n  let animationId;\n  function animate(time) {\n    render(time);\n    animationId = requestAnimationFrame(animate);\n  }\n  animate(0);\n\n  return {\n    render,\n    destroy: () => {\n      cancelAnimationFrame(animationId);\n      drawLines.destroy();\n    }\n  };\n}";
+codeEl.textContent = "// Depth example: Animated 3D spirals with depth testing and SDF borders\nexport async function init(canvas) {\n    const adapter = await navigator.gpu?.requestAdapter();\n    if (!adapter)\n        throw new Error('WebGPU not supported');\n    const device = await adapter.requestDevice();\n    const context = canvas.getContext('webgpu');\n    const format = navigator.gpu.getPreferredCanvasFormat();\n    context.configure({ device, format, alphaMode: 'premultiplied' });\n    const n = 101;\n    const width = 30;\n    const borderWidth = 5;\n    // Create positions buffer (just x values from 0 to 1)\n    const positions = new Float32Array(n * 4);\n    for (let i = 0; i < n; i++) {\n        const x = i / (n - 1);\n        positions[i * 4 + 0] = x;\n        positions[i * 4 + 1] = 0;\n        positions[i * 4 + 2] = 0;\n        positions[i * 4 + 3] = 1;\n    }\n    const positionBuffer = device.createBuffer({\n        size: positions.byteLength,\n        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n    });\n    device.queue.writeBuffer(positionBuffer, 0, positions);\n    // Uniform buffers for each spiral (one per spiral to avoid race conditions)\n    const uniformBuffers = [0, 1, 2].map(() => device.createBuffer({\n        size: 32, // time, phase, color (vec3), padding\n        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST\n    }));\n    const drawLines = createGPULines(device, {\n        colorTargets: { format },\n        depthStencil: {\n            format: 'depth24plus',\n            depthWriteEnabled: true,\n            depthCompare: 'less',\n        },\n        join: 'round',\n        cap: 'round',\n        joinResolution: 1,\n        vertexShaderBody: /* wgsl */ `\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n      @group(1) @binding(1) var<uniform> params: Params;\n\n      struct Params {\n        time: f32,\n        phase: f32,\n        color: vec3f,\n      }\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n      }\n\n      fn getVertex(index: u32) -> Vertex {\n        let p = positions[index];\n        let x = p.x;\n        let theta = 3.141 * (6.0 * x + params.time) - params.phase;\n        let pos = vec4f(\n          0.5 * cos(theta),\n          0.5 * (x * 2.0 - 1.0) * 1.5,\n          0.25 + 0.25 * sin(theta),  // WebGPU clip z is [0,1], not [-1,1]\n          1.0\n        );\n        return Vertex(pos, ${(width * devicePixelRatio).toFixed(1)});\n      }\n    `,\n        fragmentShaderBody: /* wgsl */ `\n      @group(1) @binding(1) var<uniform> params: Params;\n\n      struct Params {\n        time: f32,\n        phase: f32,\n        color: vec3f,\n      }\n\n      fn getColor(lineCoord: vec2f) -> vec4f {\n        let width = ${(width * devicePixelRatio).toFixed(1)};\n        let borderWidth = ${(borderWidth * devicePixelRatio).toFixed(1)};\n\n        // Convert the line coord into an SDF\n        let sdf = length(lineCoord) * width;\n\n        // Apply a border with smooth transition\n        let color = mix(params.color, vec3f(1.0), smoothstep(width - borderWidth - 0.5, width - borderWidth + 0.5, sdf));\n        return vec4f(color, 1.0);\n      }\n    `,\n    });\n    // Create bind groups for each spiral\n    const dataBindGroups = uniformBuffers.map(uniformBuffer => device.createBindGroup({\n        layout: drawLines.getBindGroupLayout(1),\n        entries: [\n            { binding: 0, resource: { buffer: positionBuffer } },\n            { binding: 1, resource: { buffer: uniformBuffer } }\n        ]\n    }));\n    // Create depth texture\n    let depthTexture = device.createTexture({\n        size: [canvas.width, canvas.height],\n        format: 'depth24plus',\n        usage: GPUTextureUsage.RENDER_ATTACHMENT\n    });\n    const colors = [\n        [0.5, 1.0, 0.0],\n        [0.0, 0.5, 1.0],\n        [1.0, 0.0, 0.5]\n    ];\n    const phases = [0, Math.PI * 2 / 3, Math.PI * 4 / 3];\n    function render(time = 0) {\n        // Recreate depth texture if canvas size changed\n        if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {\n            depthTexture.destroy();\n            depthTexture = device.createTexture({\n                size: [canvas.width, canvas.height],\n                format: 'depth24plus',\n                usage: GPUTextureUsage.RENDER_ATTACHMENT\n            });\n        }\n        const encoder = device.createCommandEncoder();\n        const pass = encoder.beginRenderPass({\n            colorAttachments: [{\n                    view: context.getCurrentTexture().createView(),\n                    clearValue: [0.2, 0.2, 0.2, 1],\n                    loadOp: 'clear',\n                    storeOp: 'store'\n                }],\n            depthStencilAttachment: {\n                view: depthTexture.createView(),\n                depthClearValue: 1.0,\n                depthLoadOp: 'clear',\n                depthStoreOp: 'store'\n            }\n        });\n        const props = {\n            vertexCount: n,\n            resolution: [canvas.width, canvas.height]\n        };\n        // Update uniforms for all spirals before the render pass\n        for (let i = 0; i < 3; i++) {\n            const uniforms = new Float32Array([\n                time * 0.001, // time\n                phases[i], // phase\n                0, 0, // padding\n                ...colors[i], // color\n                0 // padding\n            ]);\n            device.queue.writeBuffer(uniformBuffers[i], 0, uniforms);\n        }\n        // Draw three spirals with different phases and colors\n        for (let i = 0; i < 3; i++) {\n            drawLines.draw(pass, props, [dataBindGroups[i]]);\n        }\n        pass.end();\n        device.queue.submit([encoder.finish()]);\n    }\n    // Animation loop\n    let animationId;\n    function animate(time) {\n        render(time);\n        animationId = requestAnimationFrame(animate);\n    }\n    animate(0);\n    return {\n        render,\n        destroy: () => {\n            cancelAnimationFrame(animationId);\n            drawLines.destroy();\n        }\n    };\n}";
 hljs.highlightElement(codeEl);
 </script>
 </body>
