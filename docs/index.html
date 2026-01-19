@@ -75,6 +75,7 @@
           canvas.height = Math.floor(height * dpr);
           canvas.style.width = `${width}px`;
           canvas.style.height = `${height}px`;
+          canvas.style.border = '1px solid rgba(0,0,0,0.2)';
           return canvas;
         }
       }, {
@@ -113,7 +114,7 @@
 
     const figure = html`<figure style="margin: 0;">
       ${stack.element}
-      <figcaption>Drag handles to edit vertices. Drag background to pan, scroll to zoom.</figcaption>
+      <figcaption style="margin-top:5px">Drag handles to edit vertices. Drag background to pan, scroll to zoom.</figcaption>
     </figure>`;
 
     display(expandable(figure, {
@@ -599,7 +600,7 @@
             view: gpuContext.getCurrentTexture().createView(),
             loadOp: 'clear',
             storeOp: 'store',
-            clearValue: { r: 1.0, g: 1.0, b: 1.0, a: 1 }
+            clearValue: { r: 0, g: 0, b: 0, a: 0 }
           }]
         };
 
@@ -635,6 +636,36 @@
       loop.cancel();
       if (depthTexture) depthTexture.destroy();
     });
+  </script>
+  <script id="14a" type="module">
+    function downloadURI(uri, filename) {
+      const link = document.createElement("a");
+      link.target = '_blank';
+      link.download = filename;
+      link.href = uri;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    async function downloadInteractiveDemo() {
+      // Force a render
+      renderState.dirty = true;
+
+      // Wait for the render to complete
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await device.queue.onSubmittedWorkDone();
+
+      // Capture the canvas
+      const uri = canvas.toDataURL('image/png');
+      downloadURI(uri, 'webgpu-lines-demo.png');
+    }
+
+    const downloadBtn = html`<button style="padding: 4px 12px; cursor: pointer; margin-left: 8px;">Download PNG</button>`;
+    downloadBtn.onclick = downloadInteractiveDemo;
+
+    // Add the button to the controls
+    document.querySelector('.lines-controls')?.appendChild(downloadBtn);
   </script>
   <script id="14b" type="text/markdown">
     ---
