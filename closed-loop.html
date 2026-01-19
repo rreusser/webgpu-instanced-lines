@@ -943,7 +943,13 @@ export async function init(canvas) {
   device.queue.writeBuffer(positionBuffer, 0, positions);
 
   const drawLines = createGPULines(device, {
-    format,
+    colorTargets: {
+      format,
+      blend: {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+        alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
+      }
+    },
     join: 'round',
     // No cap needed for closed loop
     vertexShaderBody: /* wgsl */`
@@ -966,12 +972,6 @@ export async function init(canvas) {
         return vec4f(1.0, 1.0, 1.0, 0.5);
       }
     `,
-    blend: {
-      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
-    },
-    depthWrite: false,
-    depthCompare: 'always'
   });
 
   const dataBindGroup = device.createBindGroup({
@@ -1024,7 +1024,7 @@ init(canvas).catch(err => {
 
 // Syntax highlighting
 const codeEl = document.getElementById('code');
-codeEl.textContent = "// Closed loop example: Seven-sided star shape\n\nexport async function init(canvas) {\n  const adapter = await navigator.gpu?.requestAdapter();\n  const device = await adapter?.requestDevice();\n  if (!device) throw new Error('WebGPU not supported');\n\n  const context = canvas.getContext('webgpu');\n  const format = navigator.gpu.getPreferredCanvasFormat();\n  context.configure({ device, format, alphaMode: 'premultiplied' });\n\n  // A seven-sided star, with first three vertices repeated at end for closed loop\n  const n = 7;\n  const pointCount = n + 3;\n  const positions = new Float32Array(pointCount * 4);\n\n  for (let i = 0; i < pointCount; i++) {\n    const t = i / n;\n    const theta = t * Math.PI * 2 * 2;\n    const r = 0.7;\n    positions[i * 4 + 0] = r * Math.cos(theta);\n    positions[i * 4 + 1] = r * Math.sin(theta);\n    positions[i * 4 + 2] = 0;\n    positions[i * 4 + 3] = 1;\n  }\n\n  const positionBuffer = device.createBuffer({\n    size: positions.byteLength,\n    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n  });\n  device.queue.writeBuffer(positionBuffer, 0, positions);\n\n  const drawLines = createGPULines(device, {\n    format,\n    join: 'round',\n    // No cap needed for closed loop\n    vertexShaderBody: /* wgsl */`\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n      }\n\n      fn getVertex(index: u32) -> Vertex {\n        let p = positions[index];\n        // Apply aspect ratio correction\n        let aspect = uniforms.resolution.x / uniforms.resolution.y;\n        return Vertex(vec4f(p.x, p.y * aspect, p.z, p.w), 50.0 * ${devicePixelRatio.toFixed(1)});\n      }\n    `,\n    fragmentShaderBody: /* wgsl */`\n      fn getColor(lineCoord: vec2f) -> vec4f {\n        return vec4f(1.0, 1.0, 1.0, 0.5);\n      }\n    `,\n    blend: {\n      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },\n      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }\n    },\n    depthWrite: false,\n    depthCompare: 'always'\n  });\n\n  const dataBindGroup = device.createBindGroup({\n    layout: drawLines.getBindGroupLayout(1),\n    entries: [{ binding: 0, resource: { buffer: positionBuffer } }]\n  });\n\n  function render() {\n    const encoder = device.createCommandEncoder();\n    const pass = encoder.beginRenderPass({\n      colorAttachments: [{\n        view: context.getCurrentTexture().createView(),\n        clearValue: [0.2, 0.2, 0.2, 1],\n        loadOp: 'clear',\n        storeOp: 'store'\n      }]\n    });\n\n    drawLines.draw(pass, {\n      vertexCount: pointCount,\n      resolution: [canvas.width, canvas.height]\n    }, [dataBindGroup]);\n\n    pass.end();\n    device.queue.submit([encoder.finish()]);\n  }\n\n  render();\n  window.addEventListener('resize', render);\n\n  return { render, destroy: () => drawLines.destroy() };\n}";
+codeEl.textContent = "// Closed loop example: Seven-sided star shape\n\nexport async function init(canvas) {\n  const adapter = await navigator.gpu?.requestAdapter();\n  const device = await adapter?.requestDevice();\n  if (!device) throw new Error('WebGPU not supported');\n\n  const context = canvas.getContext('webgpu');\n  const format = navigator.gpu.getPreferredCanvasFormat();\n  context.configure({ device, format, alphaMode: 'premultiplied' });\n\n  // A seven-sided star, with first three vertices repeated at end for closed loop\n  const n = 7;\n  const pointCount = n + 3;\n  const positions = new Float32Array(pointCount * 4);\n\n  for (let i = 0; i < pointCount; i++) {\n    const t = i / n;\n    const theta = t * Math.PI * 2 * 2;\n    const r = 0.7;\n    positions[i * 4 + 0] = r * Math.cos(theta);\n    positions[i * 4 + 1] = r * Math.sin(theta);\n    positions[i * 4 + 2] = 0;\n    positions[i * 4 + 3] = 1;\n  }\n\n  const positionBuffer = device.createBuffer({\n    size: positions.byteLength,\n    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST\n  });\n  device.queue.writeBuffer(positionBuffer, 0, positions);\n\n  const drawLines = createGPULines(device, {\n    colorTargets: {\n      format,\n      blend: {\n        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },\n        alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }\n      }\n    },\n    join: 'round',\n    // No cap needed for closed loop\n    vertexShaderBody: /* wgsl */`\n      @group(1) @binding(0) var<storage, read> positions: array<vec4f>;\n\n      struct Vertex {\n        position: vec4f,\n        width: f32,\n      }\n\n      fn getVertex(index: u32) -> Vertex {\n        let p = positions[index];\n        // Apply aspect ratio correction\n        let aspect = uniforms.resolution.x / uniforms.resolution.y;\n        return Vertex(vec4f(p.x, p.y * aspect, p.z, p.w), 50.0 * ${devicePixelRatio.toFixed(1)});\n      }\n    `,\n    fragmentShaderBody: /* wgsl */`\n      fn getColor(lineCoord: vec2f) -> vec4f {\n        return vec4f(1.0, 1.0, 1.0, 0.5);\n      }\n    `,\n  });\n\n  const dataBindGroup = device.createBindGroup({\n    layout: drawLines.getBindGroupLayout(1),\n    entries: [{ binding: 0, resource: { buffer: positionBuffer } }]\n  });\n\n  function render() {\n    const encoder = device.createCommandEncoder();\n    const pass = encoder.beginRenderPass({\n      colorAttachments: [{\n        view: context.getCurrentTexture().createView(),\n        clearValue: [0.2, 0.2, 0.2, 1],\n        loadOp: 'clear',\n        storeOp: 'store'\n      }]\n    });\n\n    drawLines.draw(pass, {\n      vertexCount: pointCount,\n      resolution: [canvas.width, canvas.height]\n    }, [dataBindGroup]);\n\n    pass.end();\n    device.queue.submit([encoder.finish()]);\n  }\n\n  render();\n  window.addEventListener('resize', render);\n\n  return { render, destroy: () => drawLines.destroy() };\n}";
 hljs.highlightElement(codeEl);
 </script>
 </body>
