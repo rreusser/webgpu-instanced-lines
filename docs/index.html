@@ -503,6 +503,14 @@
         let stripeColor = baseColor * 0.4;  // Darker version of base
         var color = ${stripes ? 'mix(baseColor, stripeColor, stripe)' : 'baseColor'};
 
+        // Layer 2.5: Tint caps - green for start cap (x < 0), purple for end cap (x > 0)
+        let green = vec3f(0.2, 0.9, 0.3);
+        let purple = vec3f(0.8, 0.3, 0.9);
+        let isStart = step(lineCoord.x, -0.01);  // 1 if x < -0.01
+        let isEnd = step(0.01, lineCoord.x);     // 1 if x > 0.01
+        color = mix(color, green, isStart * 0.5);
+        color = mix(color, purple, isEnd * 0.5);
+
         // Layer 3: Apply stroke (50% black in debug mode, dark blue in normal mode)
         color = mix(color, vec3f(0.0), strokeMask * 0.7);
 
@@ -1002,7 +1010,7 @@ ${customShadersIntro}
       display(html`<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start;">
         <figure style="margin: 0; max-width: 200px;">
           ${lcX}
-          <figcaption><code>lineCoord.x</code> (0 on segments, varies in caps)</figcaption>
+          <figcaption><code>lineCoord.x</code> (start cap &lt; 0, end cap &gt; 0)</figcaption>
         </figure>
         <figure style="margin: 0; max-width: 200px;">
           ${lcY}
@@ -1012,10 +1020,11 @@ ${customShadersIntro}
 
       const shaderX = /* wgsl */`
         fn getColor(lineCoord: vec2f) -> vec4f {
-          // lineCoord.x is 0 for segments, varies in caps (sin(theta))
-          let t = abs(lineCoord.x);
-          // Blue for segments (x=0), orange gradient in caps
-          return vec4f(t, 0.4 * (1.0 - t), 1.0 - t, 1.0);
+          // lineCoord.x: -1 to 0 for start cap, 0 for body, 0 to +1 for end cap
+          let t = lineCoord.x * 0.5 + 0.5;  // Map to [0, 1]
+          let green = vec3f(0.2, 0.8, 0.4);
+          let purple = vec3f(0.8, 0.4, 0.8);
+          return vec4f(mix(green, purple, t), 1.0);
         }
       `;
 
