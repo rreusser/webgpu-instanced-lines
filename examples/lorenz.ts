@@ -16,7 +16,7 @@ export async function init(canvas: HTMLCanvasElement) {
   const particleCount = 64;
   const trailLength = 128;
   const dt = 0.005;
-  const lineWidth = 3;
+  const lineWidth = 6;
 
   // Lorenz parameters (classic values)
   const sigma = 10.0;
@@ -169,10 +169,24 @@ export async function init(canvas: HTMLCanvasElement) {
         particleCount: u32,
       }
 
+      // Lorenz parameters for analytic velocity
+      const sigma = 10.0;
+      const rho = 28.0;
+      const beta = 2.666667;
+
+      fn lorenzVelocity(p: vec3f) -> vec3f {
+        return vec3f(
+          sigma * (p.y - p.x),
+          p.x * (rho - p.z) - p.y,
+          p.x * p.y - beta * p.z
+        );
+      }
+
       struct Vertex {
         position: vec4f,
         width: f32,
-        t: f32, // progress along trail
+        t: f32,        // progress along trail
+        velocity: f32, // velocity magnitude (normalized)
       }
 
       fn getVertex(index: u32) -> Vertex {
@@ -183,13 +197,18 @@ export async function init(canvas: HTMLCanvasElement) {
 
         // Line break sentinel
         if (step >= lineParams.trailLength) {
-          return Vertex(vec4f(0.0, 0.0, 0.0, 0.0), 0.0, 0.0);
+          return Vertex(vec4f(0.0, 0.0, 0.0, 0.0), 0.0, 0.0, 0.0);
         }
 
         // Ring buffer lookup
         let bufferStep = (step + lineParams.stepOffset) % lineParams.trailLength;
         let bufferIdx = particle * lineParams.trailLength + bufferStep;
         let pos = state[bufferIdx].xyz;
+
+        // Compute velocity analytically from Lorenz equations
+        let vel = lorenzVelocity(pos);
+        let speed = length(vel);
+        let normalizedVelocity = clamp(speed / 300.0, 0.0, 1.0);
 
         // Scale and center the attractor, swap Y/Z so lobes are upright
         let scale = 0.04;
@@ -198,16 +217,43 @@ export async function init(canvas: HTMLCanvasElement) {
         let scaledPos = (swapped - center) * scale;
 
         let projected = projViewMatrix * vec4f(scaledPos, 1.0);
-        let t = 1.0 - f32(step) / f32(lineParams.trailLength - 1u);
-        return Vertex(projected, ${(lineWidth * devicePixelRatio).toFixed(1)} * (0.3 + 0.7 * t), t);
+        let t = f32(step) / f32(lineParams.trailLength - 1u);
+        return Vertex(projected, ${(lineWidth * devicePixelRatio).toFixed(1)} * (0.3 + 0.7 * t), t, normalizedVelocity);
       }
     `,
     fragmentShaderBody: /* wgsl */`
-      fn getColor(lineCoord: vec2f, t: f32) -> vec4f {
-        // Gradient from dim blue to bright orange
-        let startColor = vec3f(0.2, 0.7, 1.0);
-        let endColor = vec3f(0.07, 0.15, 0.3);
-        let color = mix(startColor, endColor, t);
+      fn rainbow(p: vec2f) -> vec3f {
+        let theta = p.x * ${(2.0 * Math.PI).toFixed(6)};
+        let c = cos(theta);
+        let s = sin(theta);
+        let m1 = mat3x3f(
+          0.5230851,  0.56637411, 0.46725319,
+          0.12769652, 0.14082407, 0.13691271,
+         -0.25934743,-0.12121582, 0.2348705
+        );
+        let m2 = mat3x3f(
+          0.3555664, -0.11472876,-0.01250831,
+          0.15243126,-0.03668075, 0.0765231,
+         -0.00192128,-0.01350681,-0.0036526
+        );
+        return m1 * vec3f(1.0, p.y * 2.0 - 1.0, s) +
+               m2 * vec3f(c, s * c, c * c - s * s);
+      }
+
+      fn getColor(lineCoord: vec2f, t: f32, velocity: f32) -> vec4f {
+        let width = ${(lineWidth * devicePixelRatio).toFixed(1)};
+        let borderWidth = 1.0 * ${devicePixelRatio.toFixed(1)};
+
+        // Color from velocity using rainbow palette
+        // p.x = hue (velocity), p.y = saturation/brightness control
+        let fillColor = rainbow(vec2f(velocity, t));
+
+        // SDF border
+        let sdf = length(lineCoord) * width * 0.5;
+        let borderStart = width * 0.5 - borderWidth;
+        let borderMask = smoothstep(borderStart - 0.5, borderStart + 0.5, sdf);
+        let color = mix(fillColor, vec3f(0), borderMask);
+
         return vec4f(color, 1.0);
       }
     `,
@@ -294,7 +340,7 @@ export async function init(canvas: HTMLCanvasElement) {
     const pass = encoder.beginRenderPass({
       colorAttachments: [{
         view: context.getCurrentTexture().createView(),
-        clearValue: [0.12, 0.12, 0.12, 1],
+        clearValue: [0.2, 0.2, 0.2, 1],
         loadOp: 'clear',
         storeOp: 'store'
       }],
