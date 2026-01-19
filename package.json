@@ -18,14 +18,16 @@
     "webgpu-instanced-lines.js"
   ],
   "scripts": {
-    "build:all": "npm run test && npm run build && npm run build:examples && npm run docs:build",
-    "build": "rollup -c",
-    "build:examples": "node scripts/build-examples.js",
+    "dist:clean": "rm -rf dist",
+    "build:all": "npm run test && npm run build && npm run examples:build && npm run docs:build",
+    "build": "rollup -c build/rollup.config.js",
+    "examples:build": "node build/build-examples.js",
     "prepublishOnly": "npm run build",
     "test": "node test/run-tests.js",
     "test:update": "node test/run-tests.js --update",
-    "docs:preview": "vite",
-    "docs:build": "vite build"
+    "docs:preview": "vite -c build/vite.config.js",
+    "docs:build": "vite build -c build/vite.config.js",
+    "docs:clean": "rm -rf docs"
   },
   "keywords": [
     "webgpu",

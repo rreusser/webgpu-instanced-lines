@@ -1445,7 +1445,7 @@ p .plot-d6a7b5 {
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
     </style>
-  <meta name="generator" content="Observable Notebook Kit v1.5.1"><title>WebGPU Instanced Lines</title>  <script type="module" crossorigin src="./assets/index--cjkERUU.js"></script>
+  <meta name="generator" content="Observable Notebook Kit v1.5.1"><title>WebGPU Instanced Lines</title>  <script type="module" crossorigin src="./assets/index-B2nPvM-J.js"></script>
 </head>
   <body>
     <main><div id="cell-1" class="observablehq observablehq--cell"></div><div id="cell-2" class="observablehq observablehq--cell"><div><h1>WebGPU Instanced Lines</h1>
@@ -1483,7 +1483,6 @@ p .plot-d6a7b5 {
 <span class="tok-comment">// In render loop:</span>
 <span class="tok-variable">gpuLines</span>.<span class="tok-definition">draw</span>(<span class="tok-variable">pass</span>, {
   <span class="tok-definition">vertexCount</span>: <span class="tok-variable">numPoints</span>,
-  <span class="tok-definition">width</span>: <span class="tok-literal">20</span>,
   <span class="tok-definition">resolution</span>: [<span class="tok-variable">canvas</span>.<span class="tok-definition">width</span>, <span class="tok-variable">canvas</span>.<span class="tok-definition">height</span>]
 }, [<span class="tok-variable">dataBindGroup</span>]);
 </code></pre>
@@ -1655,10 +1654,10 @@ fn getVertex(index: u32) -&gt; Vertex {
 }
 </code></pre>
 <p>Options for customization include <code>vertexFunction</code> (name of your vertex function, default <code>'getVertex'</code>), <code>positionField</code> (name of position field in struct, default <code>'position'</code>), and <code>widthField</code> (name of width field in struct, default <code>'width'</code>).</p>
-<p>Available library uniforms are <code>uniforms.resolution</code> (canvas resolution in pixels), <code>uniforms.width</code> (fallback line width if no per-vertex width), and <code>uniforms.pointCount</code> (number of points).</p>
+<p>Available library uniforms are <code>uniforms.resolution</code> (canvas resolution in pixels) and <code>uniforms.pointCount</code> (number of points).</p>
 </div></div><div id="cell-37" class="observablehq observablehq--cell"><div><h3 id="drawing" tabindex="-1"><a href="#drawing">Drawing</a></h3>
 <h4><code>gpuLines.draw(pass, props, bindGroups)</code></h4>
-<p>Draws lines in a render pass. The <code>props</code> object includes <code>vertexCount</code> (number of points in the line), <code>width</code> (line width in pixels, fallback if no per-vertex width), and <code>resolution</code> (canvas resolution as <code>[width, height]</code>). The <code>bindGroups</code> parameter is an array of user bind groups for groups 1, 2, etc.</p>
+<p>Draws lines in a render pass. The <code>props</code> object includes <code>vertexCount</code> (number of points in the line) and <code>resolution</code> (canvas resolution as <code>[width, height]</code>). The <code>bindGroups</code> parameter is an array of user bind groups for groups 1, 2, etc.</p>
 <h4><code>gpuLines.getBindGroupLayout(index)</code></h4>
 <p>Returns the bind group layout for the specified group index. Use this to create bind groups for your data.</p>
 <pre data-language="js"><code class="language-javascript"><span class="tok-keyword">const</span> <span class="tok-definition">dataBindGroup</span> = <span class="tok-variable">device</span>.<span class="tok-definition">createBindGroup</span>({
@@ -1672,7 +1671,6 @@ fn getVertex(index: u32) -&gt; Vertex {
 <span class="tok-keyword">const</span> <span class="tok-definition">pass</span> = <span class="tok-variable">encoder</span>.<span class="tok-definition">beginRenderPass</span>({ ... });
 <span class="tok-variable">gpuLines</span>.<span class="tok-definition">draw</span>(<span class="tok-variable">pass</span>, {
   <span class="tok-definition">vertexCount</span>: <span class="tok-variable">points</span>.<span class="tok-definition">length</span>,
-  <span class="tok-definition">width</span>: <span class="tok-literal">20</span>,
   <span class="tok-definition">resolution</span>: [<span class="tok-variable">canvas</span>.<span class="tok-definition">width</span>, <span class="tok-variable">canvas</span>.<span class="tok-definition">height</span>]
 }, [<span class="tok-variable">dataBindGroup</span>]);
 <span class="tok-variable">pass</span>.<span class="tok-definition">end</span>();
