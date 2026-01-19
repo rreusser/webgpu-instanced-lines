@@ -1,6 +1,6 @@
 {
   "name": "webgpu-instanced-lines",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "GPU-accelerated line rendering for WebGPU with joins and caps",
   "type": "module",
   "main": "dist/webgpu-instanced-lines.esm.js",
@@ -45,6 +45,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rreusser/webgpu-instanced-lines.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rreusser/webgpu-instanced-lines/issues"
+  },
+  "homepage": "https://github.com/rreusser/webgpu-instanced-lines#readme",
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@observablehq/notebook-kit": "^1.5.1",
