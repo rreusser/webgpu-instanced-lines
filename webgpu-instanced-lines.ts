@@ -1011,6 +1011,17 @@ function createFragmentShader({ userCode, varyings }: FragmentShaderOptions): st
   const wantsDebugVaryings = /\binstanceID\b/.test(userCode);
   const debugArgs = wantsDebugVaryings ? ', input.instanceID, input.triStripCoord' : '';
 
+  // Same opt-in for the fragment's own framebuffer position. Passed last, so
+  // adding it does not disturb an existing getColor signature. Techniques that
+  // compare a fragment against another buffer at the same pixel -- depth
+  // peeling and the rest of order-independent transparency, soft particles,
+  // screen-space dithering -- need it and cannot reconstruct it: the position a
+  // vertex function can hand across is on the line's centre, and the fragment
+  // may be up to half a stroke width away from it, which is exactly where those
+  // techniques show their artifacts.
+  const wantsFragPosition = /\bfragPosition\b/.test(userCode);
+  const fragPositionArg = wantsFragPosition ? ', input.fragPosition' : '';
+
   return /* wgsl */`
 //------------------------------------------------------------------------------
 // GPU Lines Fragment Shader
@@ -1022,6 +1033,9 @@ function createFragmentShader({ userCode, varyings }: FragmentShaderOptions): st
 // Inputs:
 //   lineCoord.x: for caps, signed distance into cap (-1 to 0 for start caps, 0 to +1 for end caps); 0 for segments/joins
 //   lineCoord.y: signed distance from line center (-1 to 1, edges at ±1)
+//
+// A getColor that names a parameter fragPosition additionally receives the
+// fragment's builtin position, passed last, after any debug varyings.
 //
 // These coordinates can be used to implement:
 //   - Anti-aliasing using SDF (signed distance field)
@@ -1044,6 +1058,8 @@ struct Uniforms {
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
 struct FragmentInput {
+  // Framebuffer position of this fragment: xy in pixels, z the depth written.
+  @builtin(position) fragPosition: vec4f,
   // Line coordinate for SDF-based effects
   @location(0) lineCoord: vec2f,
 ${varyingInputDecls}
@@ -1057,7 +1073,7 @@ ${userCode}
 
 @fragment
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
-  return getColor(input.lineCoord${getColorArgs}${debugArgs});
+  return getColor(input.lineCoord${getColorArgs}${debugArgs}${fragPositionArg});
 }
 `;
 }
